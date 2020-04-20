@@ -13,19 +13,18 @@ Raft::Raft(int num_servers): CommunicationChannels(num_servers) {
 }
 
 void Raft::crashServer(int serverId) {
-    if (serverId >= servers.size()) {
-        cout << "Invalid server id";
-        return;
-    }
+    assert(serverId < num_servers);
 
     servers[serverId].crash();
 }
 
 void Raft::restartServer(int serverId) {
-    if (serverId >= servers.size()) {
-        cout << "Invalid server id";
-        return;
-    }
+    assert(serverId < num_servers);
 
     servers[serverId].restart();
+}
+
+string Raft::clientRequest(int serverId, string stationMachineCommand) {
+    assert(serverId < num_servers);
+    return servers[serverId].onClientRequest(stationMachineCommand);
 }
