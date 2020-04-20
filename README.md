@@ -1,10 +1,9 @@
 # Raft
-## Pengcheng Rong
-## Aaron Chang
+Pengcheng Rong
+Aaron Chang
 
 ### Implementation
-### We can keep overviews or notes here as we work on the 2 different parts
+*We can keep overviews or notes here as we work on the 2 different parts*
+### Log Replication (Pengcheng)
 
-### Log Replication
-
-### Elections
+### Elections (Aaron)
