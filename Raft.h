@@ -38,4 +38,7 @@ class Raft: public CommunicationChannels {
 
     void restartServer(int serverId);
 
+    // this call should be blocking
+    string clientRequest(int requestedServer, string stationMachineCommand) ;
+
 };

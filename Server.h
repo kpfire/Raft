@@ -61,6 +61,12 @@ class Server {
     void eventLoop();
 
     void handleMessage(int fromServerId, string message);
+
+    string onClientRequest(string stationMachineCommand) {
+        // if this is not the leader, reject it and tell who the leader it
+        // otherwise handle the message in a blocking manner (add to local log, send out replicate message to
+        // other servers, and monitor incoming channels from other servers to see if it is done)
+    }
 };
 
 #endif

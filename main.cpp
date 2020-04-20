@@ -43,18 +43,22 @@ int main(int argc, char * argv[]) {
             // stop server stoi(parts[1])
             raft->crashServer(stoi(parts[1]));
         } else if (cmd.rfind("RestartServer", 0) == 0) {
+            assert(raft != NULL);
             vector<string> parts;
             split1(cmd, parts);
             assert(parts.size() == 2);
             // start server stoi(parts[1])
             raft->restartServer(stoi(parts[1]));
         } else if (cmd.rfind("Request", 0) == 0) {
+            assert(raft != NULL);
             vector<string> parts;
             split1(cmd, parts);
             assert(parts.size() == 3);
             int requestedServer = stoi(parts[1]);
             string stationMachineCommand = parts[2];
             // client ask requestedServer to perform stationMachineCommand
+            string response = raft->clientRequest(requestedServer, stationMachineCommand);
+            cout << "Server " << requestedServer << " responded: " << response << endl;
         } 
         // else {
             // cout << "Invalid command" << endl;
