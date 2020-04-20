@@ -22,6 +22,7 @@ void Server::restart() {
 }
 
 void Server::eventLoop() {
+    // Eventually check for election timeout here
     while (true) {
         if (online) {
             cout << "Server " << this->serverId << " is running..." << endl;
@@ -37,7 +38,7 @@ void Server::eventLoop() {
                 raft->locks[key].unlock();
             }
         }
-        sleep(1);
+        sleep(100);
     }
 }
 

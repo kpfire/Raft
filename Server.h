@@ -29,6 +29,8 @@ class Server {
     //Own our variables
     //Use a boolean variable to mimic server crashes. If it is false, then the server should be not responding.
     bool online;
+    // Interval to sleep between checking for requests, also factors into checking the election timeout at every execution
+    int interval;
 
     CommunicationChannels* raft;
 
