@@ -16,13 +16,19 @@
 #include <climits>
 #include <numeric>
 #include <unistd.h>
+#include <future>
 
-#include "CommunicationChannels.h"
+#include "Raft.h"
+#include "AppendEntries.h"
+#include "RequestVote.h"
+#include "ClientRequest.h"
 
 using namespace std;
 
 #ifndef SERVER
 #define SERVER
+
+class Raft;
 
 class Server {
     private:
@@ -32,7 +38,7 @@ class Server {
     // Interval to sleep between checking for requests, also factors into checking the election timeout at every execution
     int interval;
 
-    CommunicationChannels* raft;
+    Raft* raft;
 
     //Persistent state on all servers
     int currentTerm;
@@ -52,7 +58,7 @@ class Server {
 
     public:
     int serverId;
-    Server(int serverId, CommunicationChannels* raft):serverId(serverId), raft(raft) {
+    Server(int serverId, Raft* raft):serverId(serverId), raft(raft) {
         onServerStart();
     };
 
@@ -62,13 +68,11 @@ class Server {
 
     void eventLoop();
 
-    string handleMessage(int fromServerId, string message);
+    void append(AppendEntries, std::promise<AppendEntriesResponse> && p);
 
-    string onClientRequest(string stationMachineCommand) {
-        // if this is not the leader, reject it and tell who the leader it
-        // otherwise handle the message in a blocking manner (add to local log, send out replicate message to
-        // other servers, and monitor incoming channels from other servers to see if it is done)
-    }
+    void vote(RequestVote, std::promise<RequestVoteResponse> && p);
+
+    void clientRequest(ClientRequest, std::promise<ClientRequestResponse> && p);
 };
 
 #endif

@@ -1,6 +1,6 @@
 #include "Raft.h"
 
-Raft::Raft(int num_servers): CommunicationChannels(num_servers) {
+Raft::Raft(int num_servers): num_servers(num_servers) {
     // start the specified amount of servers(threads)
     for (int i=0; i<num_servers; i++) {
         Server svr(i, this);
@@ -24,7 +24,18 @@ void Raft::restartServer(int serverId) {
     servers[serverId].restart();
 }
 
-string Raft::clientRequest(int serverId, string stationMachineCommand) {
+ClientRequestResponse Raft::clientRequest(int serverId, string stationMachineCommand) {
     assert(serverId < num_servers);
-    return servers[serverId].onClientRequest(stationMachineCommand);
+    vector<string> parts;
+    split1(stationMachineCommand, parts);
+    assert(parts.size() == 2);
+    ClientRequest request;
+    request.key = parts[0];
+    request.valueDelta = stoi(parts[1]);
+
+    std::promise<ClientRequestResponse> p;
+    auto f = p.get_future();
+    std::thread t(&Server::clientRequest, servers[serverId], request, std::move(p));
+    t.join();
+    return f.get();
 }

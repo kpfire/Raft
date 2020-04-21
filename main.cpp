@@ -19,6 +19,7 @@
 #include "utilities.h"
 #include "Server.h"
 #include "Raft.h"
+#include "ClientRequest.h"
 
 using namespace std;
 
@@ -57,8 +58,8 @@ int main(int argc, char * argv[]) {
             int requestedServer = stoi(parts[1]);
             string stationMachineCommand = parts[2];
             // client ask requestedServer to perform stationMachineCommand
-            string response = raft->clientRequest(requestedServer, stationMachineCommand);
-            cout << "Server " << requestedServer << " responded: " << response << endl;
+            ClientRequestResponse response = raft->clientRequest(requestedServer, stationMachineCommand);
+            cout << "Server " << requestedServer << " responded: " << response.message << endl;
         } 
         // else {
             // cout << "Invalid command" << endl;

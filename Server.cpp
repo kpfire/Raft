@@ -26,67 +26,35 @@ void Server::eventLoop() {
     while (true) {
         if (online) {
             cout << "Server " << this->serverId << " is running..." << endl;
-            for (int i=0; i<raft->num_servers; i++) {
-                if (i == serverId) continue;
-                // key for locks is always the same
-                pair<int, int> lock_key;
-                if (i < serverId) lock_key = {i, serverId};
-                else lock_key = {serverId, i};
-                // Key for channels needs to stay ordered
-                pair<int, int> key {i, serverId};
-                raft->locks[lock_key].lock();
-                string response;
-                // check incoming messages from server i
-                while (raft->channels[key].size() > 0) {
-                    response = handleMessage(i, raft->channels[key].front());
-                    raft->channels[key].pop();
-                    // put the response onto the outgoing channel
-                    pair<int, int> response_key {serverId, i};
-                    raft->channels[response_key].push(response);
-                }
-                raft->locks[lock_key].unlock();
-            }
+            
         }
-        sleep(100);
+        sleep(1);
     }
 }
 
-string Server::handleMessage(int fromServerId, string message) {
-    cout << fromServerId << " -> " << serverId << ": " << message << endl;
+// the caller of all below methods should invoke these rpc calls in a separate thread
+// see Raft::clientRequest for an example
 
-    if (message.rfind("RequestVote ", 0) == 0) {
-        vector<string> parts;
-        split1(message, parts);
-        assert(parts.size() == 5);
-        int term = stoi(parts[1]);
-        int candidateId = stoi(parts[2]);
-        int lastLogIndex = stoi(parts[3]);
-        int lastLogTerm = stoi(parts[4]);
-        // vote logic goes here...
-        string response;
+void Server::append(AppendEntries, std::promise<AppendEntriesResponse> && p) {
+    AppendEntriesResponse response;
+    response.success = true;
+    response.term = 0;
+    p.set_value(response);
+}
 
-        return response;
-    } else if (message.rfind("AppendEntries ", 0) == 0) {
-        vector<string> parts;
-        split1(message, parts);
-        assert(parts.size() == 7);
-        int term = stoi(parts[1]);
-        int leaderId = stoi(parts[2]);
-        int prevLogIndex = stoi(parts[3]);
-        int prevLogTerm = stoi(parts[4]);
-        string entry = parts[5]; // we can only store one log entry at a time. 
-        int leaderCommit = stoi(parts[6]);
-        // append entry logic goes here...
-        string response;
+void Server::vote(RequestVote, std::promise<RequestVoteResponse> && p) {
+    RequestVoteResponse response;
+    response.voteGranted = true;
+    response.term = 0;
+    p.set_value(response);
+}
 
-        return response;
-    } else if (message.rfind("RequestVoteResponse ", 0) == 0) {
-        vector<string> parts;
-        split1(message, parts);
-    } else if (message.rfind("AppendEntriesResponse ", 0) == 0) {
-        vector<string> parts;
-        split1(message, parts);
-    } else {
-        assert(false);
-    }
+void Server::clientRequest(ClientRequest, std::promise<ClientRequestResponse> && p) {
+    // if this is not the leader, reject it and tell who the leader it
+    // otherwise handle the message in a blocking manner (add to local log, send out replicate message to
+    // other servers, and monitor incoming channels from other servers to see if it is done)
+    ClientRequestResponse response;
+    response.succeed = true;
+    response.message = "stored";
+    p.set_value(response);
 }

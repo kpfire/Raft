@@ -15,19 +15,24 @@
 #include <climits>
 #include <numeric>
 
+
+#ifndef RAFT
+#define RAFT
+
 #include "Server.h"
 #include "utilities.h"
-#include "CommunicationChannels.h"
 
 // Raft is represents the overall infrastracture of the project. It manages servers and threads.
 // It offers communication channels between threads.
-class Raft: public CommunicationChannels {
+class Raft {
     private:
     // Servers and their corresponding threads.
     vector<Server> servers;
     vector<std::thread> handles;
     
     public:
+    int num_servers;
+    
     Raft(int totalServers);
 
     ~Raft() {
@@ -38,7 +43,8 @@ class Raft: public CommunicationChannels {
 
     void restartServer(int serverId);
 
-    // this call should be blocking
-    string clientRequest(int requestedServer, string stationMachineCommand) ;
+    ClientRequestResponse clientRequest(int requestedServer, string stationMachineCommand) ;
 
 };
+
+#endif
