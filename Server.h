@@ -62,7 +62,7 @@ class Server {
 
     void eventLoop();
 
-    void handleMessage(int fromServerId, string message);
+    string handleMessage(int fromServerId, string message);
 
     string onClientRequest(string stationMachineCommand) {
         // if this is not the leader, reject it and tell who the leader it

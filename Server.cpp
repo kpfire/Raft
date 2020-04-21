@@ -28,21 +28,29 @@ void Server::eventLoop() {
             cout << "Server " << this->serverId << " is running..." << endl;
             for (int i=0; i<raft->num_servers; i++) {
                 if (i == serverId) continue;
-                // check incoming messages from server i
+                // key for locks is always the same
+                if (i < serverId) pair<int, int> lock_key {i, serverId};
+                else pair<int, int> lock_key {serverId, i};
+                // Key for channels needs to stay ordered
                 pair<int, int> key {i, serverId};
-                raft->locks[key].lock();
+                raft->locks[lock_key].lock();
+                string response;
+                // check incoming messages from server i
                 while (raft->channels[key].size() > 0) {
-                    handleMessage(i, raft->channels[key].front());
+                    response = handleMessage(i, raft->channels[key].front());
                     raft->channels[key].pop();
+                    // put the response onto the outgoing channel
+                    pair<int, int> response_key {serverId, i};
+                    raft->channels[response_key].push(response);
                 }
-                raft->locks[key].unlock();
+                raft->locks[lock_key].unlock();
             }
         }
         sleep(100);
     }
 }
 
-void Server::handleMessage(int fromServerId, string message) {
+string Server::handleMessage(int fromServerId, string message) {
     cout << fromServerId << " -> " << serverId << ": " << message << endl;
 
     if (message.rfind("RequestVote ", 0) == 0) {
@@ -54,6 +62,9 @@ void Server::handleMessage(int fromServerId, string message) {
         int lastLogIndex = stoi(parts[3]);
         int lastLogTerm = stoi(parts[4]);
         // vote logic goes here...
+        string response;
+
+        return response;
     } else if (message.rfind("AppendEntries ", 0) == 0) {
         vector<string> parts;
         split1(message, parts);
@@ -65,6 +76,9 @@ void Server::handleMessage(int fromServerId, string message) {
         string entry = parts[5]; // we can only store one log entry at a time. 
         int leaderCommit = stoi(parts[6]);
         // append entry logic goes here...
+        string response;
+
+        return response;
     } else if (message.rfind("RequestVoteResponse ", 0) == 0) {
         vector<string> parts;
         split1(message, parts);
