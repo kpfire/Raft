@@ -10,7 +10,7 @@ struct AppendEntries {
     int leaderId;
     int prevLogIndex;
     int prevLogTerm;
-    string entry;
+    pair<string, int> entry;
     int leaderCommit;
 };
 

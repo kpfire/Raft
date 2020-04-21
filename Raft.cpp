@@ -24,10 +24,10 @@ void Raft::restartServer(int serverId) {
     servers[serverId].restart();
 }
 
-ClientRequestResponse Raft::clientRequest(int serverId, string stationMachineCommand) {
+ClientRequestResponse Raft::clientRequest(int serverId, string stateMachineCommand) {
     assert(serverId < num_servers);
     vector<string> parts;
-    split1(stationMachineCommand, parts);
+    split1(stateMachineCommand, parts);
     assert(parts.size() == 2);
     ClientRequest request;
     request.key = parts[0];

@@ -37,21 +37,21 @@ void Server::eventLoop() {
 // the caller of all below methods should invoke these rpc calls in a separate thread
 // see Raft::clientRequest for an example
 
-void Server::append(AppendEntries, std::promise<AppendEntriesResponse> && p) {
+void Server::append(AppendEntries appendEntries, std::promise<AppendEntriesResponse> && p) {
     AppendEntriesResponse response;
     response.success = true;
     response.term = 0;
     p.set_value(response);
 }
 
-void Server::vote(RequestVote, std::promise<RequestVoteResponse> && p) {
+void Server::vote(RequestVote requestVote, std::promise<RequestVoteResponse> && p) {
     RequestVoteResponse response;
     response.voteGranted = true;
     response.term = 0;
     p.set_value(response);
 }
 
-void Server::clientRequest(ClientRequest, std::promise<ClientRequestResponse> && p) {
+void Server::clientRequest(ClientRequest clientRequest, std::promise<ClientRequestResponse> && p) {
     // if this is not the leader, reject it and tell who the leader it
     // otherwise handle the message in a blocking manner (add to local log, send out replicate message to
     // other servers, and monitor incoming channels from other servers to see if it is done)
