@@ -27,6 +27,8 @@ void Server::eventLoop() {
         if (online) {
             cout << "Server " << this->serverId << " is running..." << endl;
             
+            // if a server wants to start a vote, it should create separate threads for each OTHER server
+            // and call "vote" for each server.
         }
         sleep(1);
     }
@@ -57,4 +59,7 @@ void Server::clientRequest(ClientRequest, std::promise<ClientRequestResponse> &&
     response.succeed = true;
     response.message = "stored";
     p.set_value(response);
+
+    //The leader needs to replicate the message to other servers. So it should create separate threads for each OTHER server
+    //and call "append" for each server
 }
