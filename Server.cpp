@@ -29,8 +29,9 @@ void Server::eventLoop() {
             for (int i=0; i<raft->num_servers; i++) {
                 if (i == serverId) continue;
                 // key for locks is always the same
-                if (i < serverId) pair<int, int> lock_key {i, serverId};
-                else pair<int, int> lock_key {serverId, i};
+                pair<int, int> lock_key;
+                if (i < serverId) lock_key = {i, serverId};
+                else lock_key = {serverId, i};
                 // Key for channels needs to stay ordered
                 pair<int, int> key {i, serverId};
                 raft->locks[lock_key].lock();
