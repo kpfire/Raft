@@ -54,11 +54,15 @@ int main(int argc, char * argv[]) {
             assert(raft != NULL);
             vector<string> parts;
             split1(cmd, parts);
-            assert(parts.size() == 3);
+            assert(parts.size() == 3 || parts.size() == 4);
             int requestedServer = stoi(parts[1]);
             string stationMachineCommand = parts[2];
+            if (parts.size() == 4) {
+                // this is an update
+                stationMachineCommand += " " + parts[3];
+            }
             // client ask requestedServer to perform stationMachineCommand
-            ClientRequestResponse response = raft->clientRequest(requestedServer, stationMachineCommand);
+            ClientRequestResponse response = raft->clientRequestRPC(requestedServer, stationMachineCommand);
             cout << "Server " << requestedServer << " responded: " << response.message << endl;
         } 
         // else {

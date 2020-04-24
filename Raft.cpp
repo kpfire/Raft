@@ -24,14 +24,17 @@ void Raft::restartServer(int serverId) {
     servers[serverId].restart();
 }
 
-ClientRequestResponse Raft::clientRequest(int serverId, string stateMachineCommand) {
+ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCommand) {
     assert(serverId < num_servers);
     vector<string> parts;
     split1(stateMachineCommand, parts);
-    assert(parts.size() == 2);
     ClientRequest request;
     request.key = parts[0];
-    request.valueDelta = stoi(parts[1]);
+    if (parts.size() > 1) {
+        request.valueDelta = stoi(parts[1]);
+    } else {
+        request.valueDelta = 0;
+    }
 
     std::promise<ClientRequestResponse> p;
     auto f = p.get_future();

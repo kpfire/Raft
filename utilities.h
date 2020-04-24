@@ -3,6 +3,8 @@
 
 const int OBSERVER_NODE_ID = 1000001;
 
+enum ServerState {Leader, Candidate, Follower};
+
 // split string utility function
 template <class Container>
 void split1(const std::string& str, Container& cont)

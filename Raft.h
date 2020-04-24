@@ -26,24 +26,25 @@
 // It offers communication channels between threads.
 class Raft {
     private:
-    // Servers and their corresponding threads.
-    vector<Server> servers;
+    // Threads for each server. Currently not being used.
     vector<std::thread> handles;
     
     public:
+    // List of ervers
+    vector<Server> servers;
+
     int num_servers;
     
     Raft(int totalServers);
 
-    ~Raft() {
-        
-    }
+    ~Raft() { }
 
     void crashServer(int serverId);
 
     void restartServer(int serverId);
 
-    ClientRequestResponse clientRequest(int requestedServer, string stationMachineCommand) ;
+    // RPC functions run on the caller
+    ClientRequestResponse clientRequestRPC(int requestedServer, string stationMachineCommand) ;
 
 };
 

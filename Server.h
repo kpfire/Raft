@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <future>
 
+#include "Utilities.h"
 #include "Raft.h"
 #include "AppendEntries.h"
 #include "RequestVote.h"
@@ -37,6 +38,14 @@ class Server {
     bool online;
     // Interval to sleep between checking for requests, also factors into checking the election timeout at every execution
     int interval;
+    // use a map to represent the state machin
+    unordered_map<string, int> stateMachine;
+    // server state
+    ServerState state;
+    // the current id of leader
+    int leaderId;
+    // barriers to replicate each log entry
+    unordered_map<int, pthread_barrier_t> barriers;
 
     Raft* raft;
 
@@ -56,8 +65,15 @@ class Server {
 
     void onServerStart();
 
+    void convertToFollowerIfNecessary(int, int);
+
+    // after leader appens one entry to its log, call this to replicate this entry to all folloers
+    void replicateLogEntry(int, int);
+
     public:
+    // this server's identifier
     int serverId;
+
     Server(int serverId, Raft* raft):serverId(serverId), raft(raft) {
         onServerStart();
     };
@@ -66,13 +82,19 @@ class Server {
 
     void restart();
 
-    void eventLoop();
+    void eventLoop();    
 
-    void append(AppendEntries, std::promise<AppendEntriesResponse> && p);
+    // functions that run on the callee
+    void appendEntries(AppendEntries, std::promise<AppendEntriesResponse> && p);
 
-    void vote(RequestVote, std::promise<RequestVoteResponse> && p);
+    void requestVote(RequestVote, std::promise<RequestVoteResponse> && p);
 
     void clientRequest(ClientRequest, std::promise<ClientRequestResponse> && p);
+
+    // RPC functions run on the caller
+    RequestVoteResponse requestVoteRPC(RequestVote, int);
+
+    AppendEntriesResponse appendEntriesRPC(int, int);
 };
 
 #endif
