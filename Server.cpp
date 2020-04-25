@@ -4,6 +4,9 @@ void Server::onServerStart() {
     online = true;
     state = Follower;
     leaderId = -1;
+    interval = 1; // seconds between checking for requests
+    timeout = 5; // election timeout in seconds
+    last_time = clock();
     // reset volatile variables because they are supposed to be lost
     commitIndex = 0;
     lastApplied = -1;
@@ -24,14 +27,19 @@ void Server::restart() {
 }
 
 void Server::eventLoop() {
-    // Eventually check for election timeout here
     while (true) {
         if (online) {
             cout << "Server " << this->serverId << " is running..." << endl;
-            
+            // Check election timeout value
+            float current_time = clock();
+            float time_passed = current_time - last_time;
+            last_time = current_time;
+            if (time_passed > timeout) {
+                //call requestVoteRPC here?
+            }
             // if a server wants to start a vote, call requestVoteRPC
         }
-        sleep(1);
+        sleep(interval);
     }
 }
 

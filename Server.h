@@ -17,6 +17,7 @@
 #include <numeric>
 #include <unistd.h>
 #include <future>
+#include <time.h>
 
 #include "Utilities.h"
 #include "Raft.h"
@@ -38,7 +39,11 @@ class Server {
     bool online;
     // Interval to sleep between checking for requests, also factors into checking the election timeout at every execution
     int interval;
-    // use a map to represent the state machin
+    // Election timeout limit in seconds
+    float timeout;
+    // Time at last execution loop, used for checking timeout;
+    clock_t last_time;
+    // use a map to represent the state machine
     unordered_map<string, int> stateMachine;
     // server state
     ServerState state;
