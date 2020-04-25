@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <future>
 #include <time.h>
+#include <stdlib.h>
 
 #include "Utilities.h"
 #include "Raft.h"

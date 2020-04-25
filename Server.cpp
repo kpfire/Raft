@@ -5,8 +5,10 @@ void Server::onServerStart() {
     state = Follower;
     leaderId = -1;
     interval = 1; // seconds between checking for requests
-    timeout = 5; // election timeout in seconds
+    // randomized election timeout
+    timeout = 5 + rand() % 5;
     last_time = clock();
+    votedFor = -1; // instead of NULL
     // reset volatile variables because they are supposed to be lost
     commitIndex = 0;
     lastApplied = -1;
@@ -31,13 +33,25 @@ void Server::eventLoop() {
         if (online) {
             cout << "Server " << this->serverId << " is running..." << endl;
             // Check election timeout value
-            float current_time = clock();
-            float time_passed = current_time - last_time;
-            last_time = current_time;
+            float time_passed = (clock() - last_time)/CLOCKS_PER_SEC;
             if (time_passed > timeout) {
-                //call requestVoteRPC here?
+                state = Candidate
+                currentTerm += 1;
+                int collected_votes = 1; // votes for self
+                // Request votes from everyone but self
+                RequestVote req = {currentTerm, serverId, commitIndex, log[commitIndex].first};
+                for (int ids = 0; ids < raft->num_servers; ids++) {
+                    if (ids == serverId) continue;
+                    if (requestVoteRPC(req, ids).voteGranted == true) collected_votes++;
+                }
+                int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
+                // Also recheck if state was reset before winning election
+                if (collected_votes < majority || state == Follower) continue;
+                else {
+                    state = Leader;
+                }
+                last_time = clock();                 
             }
-            // if a server wants to start a vote, call requestVoteRPC
         }
         sleep(interval);
     }
@@ -50,6 +64,9 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
     if (maxTerm > currentTerm) {
         currentTerm = maxTerm;
         state = Follower;
+        // Reset election variables
+        last_time = clock();
+        votedFor = -1;
     }
 }
 
@@ -57,7 +74,7 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
 // see Raft::clientRequest for an example
 
 void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResponse> && p) {
-    AppendEntriesResponse response;    
+    AppendEntriesResponse response;
     if (request.term < currentTerm) {
         // Reply false if term < currentTerm (§5.1)
         response.success = false;
@@ -99,12 +116,17 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
 
 void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> && p) {
     RequestVoteResponse response;
-
-    // logic goes here...
-    response.voteGranted = true;
-    response.term = 0;
+    response.term = currentTerm;
+    response.voteGranted = false;
+    if (request.term >= currentTerm) {
+        if (votedFor == -1 || votedFor == request.candidateId) {
+            if (request.lastLogIndex >= commitIndex && request.lastLogTerm >= log[commitIndex].first) {
+                response.voteGranted = true;
+            }
+        }
+    }
+    votedFor = request.candidateId;
     p.set_value(response);
-
     convertToFollowerIfNecessary(request.term, response.term);
 }
 
