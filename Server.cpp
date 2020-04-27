@@ -32,25 +32,34 @@ void Server::eventLoop() {
     while (true) {
         if (online) {
             cout << "Server " << this->serverId << " is running..." << endl;
-            // Check election timeout value
-            float time_passed = (clock() - last_time)/CLOCKS_PER_SEC;
-            if (time_passed > timeout) {
-                state = Candidate
-                currentTerm += 1;
-                int collected_votes = 1; // votes for self
-                // Request votes from everyone but self
-                RequestVote req = {currentTerm, serverId, commitIndex, log[commitIndex].first};
+            if (state != Leader){
+                // Check election timeout value
+                float time_passed = (clock() - last_time)/CLOCKS_PER_SEC;
+                if (time_passed > timeout) {
+                    state = Candidate
+                    currentTerm += 1;
+                    int collected_votes = 1; // votes for self
+                    // Request votes from everyone but self
+                    RequestVote req = {currentTerm, serverId, commitIndex, log[commitIndex].first};
+                    for (int ids = 0; ids < raft->num_servers; ids++) {
+                        if (ids == serverId) continue;
+                        if (requestVoteRPC(req, ids).voteGranted == true) collected_votes++;
+                    }
+                    int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
+                    // Also recheck if state was reset before winning election
+                    if (collected_votes < majority || state == Follower) continue;
+                    else {
+                        state = Leader;
+                    }
+                    last_time = clock();                 
+                }
+            }
+            if (state == Leader) {
+                // send out heartbeat
                 for (int ids = 0; ids < raft->num_servers; ids++) {
                     if (ids == serverId) continue;
-                    if (requestVoteRPC(req, ids).voteGranted == true) collected_votes++;
+                    appendEntriesRPC(-1, ids);
                 }
-                int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
-                // Also recheck if state was reset before winning election
-                if (collected_votes < majority || state == Follower) continue;
-                else {
-                    state = Leader;
-                }
-                last_time = clock();                 
             }
         }
         sleep(interval);
@@ -75,6 +84,12 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
 
 void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResponse> && p) {
     AppendEntriesResponse response;
+    // If this is just a heartbeat
+    if (request.leaderCommit == -1) {
+        response.success = true;
+        response.term = -1;
+        return response;   
+    }
     if (request.term < currentTerm) {
         // Reply false if term < currentTerm (§5.1)
         response.success = false;
@@ -197,12 +212,18 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
 // RPC functions run on the caller
 AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicateTo) {
     AppendEntries request;
-    request.term = currentTerm;
-    request.leaderId = serverId;
-    request.prevLogIndex = replicateIndex - 1;
-    request.prevLogTerm = log[replicateIndex - 1].first;
-    request.entry = log[replicateIndex].second;
-    request.leaderCommit = commitIndex;
+    // Heartbeat message?
+    if (replicateIndex == -1) {
+        request.leaderCommit = -1;
+    }
+    else {
+        request.term = currentTerm;
+        request.leaderId = serverId;
+        request.prevLogIndex = replicateIndex - 1;
+        request.prevLogTerm = log[replicateIndex - 1].first;
+        request.entry = log[replicateIndex].second;
+        request.leaderCommit = commitIndex;
+    }
     std::promise<AppendEntriesResponse> p;
     auto f = p.get_future();
     std::thread t(&Server::appendEntries, raft->servers[replicateTo], request, std::move(p));
