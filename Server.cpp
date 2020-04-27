@@ -73,10 +73,11 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
     if (maxTerm > currentTerm) {
         currentTerm = maxTerm;
         state = Follower;
-        // Reset election variables
-        last_time = clock();
+        // Reset votedFor only if it's a new leader
         votedFor = -1;
     }
+    // If we called this, it was from an RPC and we can reset the election timer
+    last_time = clock();
 }
 
 // the caller of all below methods should invoke these rpc calls in a separate thread
@@ -84,13 +85,13 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
 
 void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResponse> && p) {
     AppendEntriesResponse response;
-    // If this is just a heartbeat
+    
     if (request.leaderCommit == -1) {
+        // This is just an empty heartbeat
         response.success = true;
         response.term = -1;
-        return response;   
     }
-    if (request.term < currentTerm) {
+    else if (request.term < currentTerm) {
         // Reply false if term < currentTerm (§5.1)
         response.success = false;
         response.term = currentTerm;
@@ -215,6 +216,7 @@ AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicate
     // Heartbeat message?
     if (replicateIndex == -1) {
         request.leaderCommit = -1;
+        request.term = currentTerm;
     }
     else {
         request.term = currentTerm;
