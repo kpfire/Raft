@@ -50,17 +50,14 @@ void Server::eventLoop() {
                         responses.push_back(future);
                     }
                     //use the .get() method on each future to get the response
-                    
                     int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
                     bool won_election = false;
                     // Collect votes asynchronously
                     while(((clock()/CLOCKS_PER_SEC) - election_start) < timeout && !won_election) {
                         auto it = responses.begin();
                         while(it != responses.end() && !won_election) {
-                            std::thread& t = it->first;
-                            std::future<RequestVoteResponse>& f = it->second;
+                            std::future<RequestVoteResponse>& f = *it;
                             if (f.wait_for(0ms) == std::future_status::ready) { // This thread is done running
-                                t.join();
                                 if (f.get().voteGranted == true) {
                                     collected_votes++;
                                     if (collected_votes >= majority) won_election = true;
