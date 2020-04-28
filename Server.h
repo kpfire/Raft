@@ -19,8 +19,9 @@
 #include <future>
 #include <time.h>
 #include <stdlib.h>
+#include <math.h>
 
-#include "Utilities.h"
+#include "utilities.h"
 #include "Raft.h"
 #include "AppendEntries.h"
 #include "RequestVote.h"

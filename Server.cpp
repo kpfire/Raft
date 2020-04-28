@@ -36,7 +36,7 @@ void Server::eventLoop() {
                 // Check election timeout value
                 float time_passed = (clock() - last_time)/CLOCKS_PER_SEC;
                 if (time_passed > timeout && votedFor != -1) {
-                    state = Candidate
+                    state = Candidate;
                     currentTerm += 1;
                     int collected_votes = 1; // votes for self
                     // Request votes from everyone but self
