@@ -43,23 +43,22 @@ void Server::eventLoop() {
                     int collected_votes = 1; // votes for self
                     // Request votes from everyone but self
                     RequestVote req = {currentTerm, serverId, commitIndex, log[commitIndex].first};
-                    vector<pair <std::thread, std::future<RequestVoteResponse>>> responses;
+                    vector<std::future<RequestVoteResponse>> responses;
                     for (int ids = 0; ids < raft->num_servers; ids++) {
                         if (ids == serverId) continue;
-                        std::promise<RequestVoteResponse> p;
-                        auto f = p.get_future();
-                        std::thread t(&Server::requestVoteRPC, req, ids, std::move(p));
-                        responses.push_back(make_pair(t, f));
+                        auto future = std::async(&Server::requestVoteRPC, raft->servers[ids], req, ids);
+                        responses.push_back(future);
                     }
+                    //use the .get() method on each future to get the response
+                    
                     int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
                     bool won_election = false;
                     // Collect votes asynchronously
                     while(((clock()/CLOCKS_PER_SEC) - election_start) < timeout && !won_election) {
                         auto it = responses.begin();
                         while(it != responses.end() && !won_election) {
-                            auto p = *it;
-                            auto t = p.first;
-                            auto f = p.second;
+                            std::thread& t = it->first;
+                            std::future<RequestVoteResponse>& f = it->second;
                             if (f.wait_for(0ms) == std::future_status::ready) { // This thread is done running
                                 t.join();
                                 if (f.get().voteGranted == true) {
