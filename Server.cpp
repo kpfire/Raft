@@ -36,18 +36,43 @@ void Server::eventLoop() {
                 // Check election timeout value
                 float time_passed = (clock() - last_time)/CLOCKS_PER_SEC;
                 if (time_passed > timeout && votedFor != -1) {
+                    // Hold an election
+                    float election_start = clock()/CLOCKS_PER_SEC;
                     state = Candidate;
                     currentTerm += 1;
                     int collected_votes = 1; // votes for self
                     // Request votes from everyone but self
                     RequestVote req = {currentTerm, serverId, commitIndex, log[commitIndex].first};
+                    vector<pair <std::thread, std::future<RequestVoteResponse>>> responses;
                     for (int ids = 0; ids < raft->num_servers; ids++) {
                         if (ids == serverId) continue;
-                        if (requestVoteRPC(req, ids).voteGranted == true) collected_votes++;
+                        std::promise<RequestVoteResponse> p;
+                        auto f = p.get_future();
+                        std::thread t(&Server::requestVoteRPC, req, ids, std::move(p));
+                        responses.push_back(make_pair(t, f));
                     }
                     int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
+                    bool won_election = false;
+                    // Collect votes asynchronously
+                    while(((clock()/CLOCKS_PER_SEC) - election_start) < timeout && !won_election) {
+                        auto it = responses.begin();
+                        while(it != responses.end() && !won_election) {
+                            auto p = *it;
+                            auto t = p.first;
+                            auto f = p.second;
+                            if (f.wait_for(0ms) == std::future_status::ready) { // This thread is done running
+                                t.join();
+                                if (f.get().voteGranted == true) {
+                                    collected_votes++;
+                                    if (collected_votes >= majority) won_election = true;
+                                }
+                                it = responses.erase(it);
+                            }
+                            else ++it;
+                        }
+                    }
                     // Also recheck if state was reset before winning election
-                    if (collected_votes < majority || state == Follower) continue;
+                    if (!won_election || state == Follower) continue;
                     else {
                         state = Leader;
                     }
