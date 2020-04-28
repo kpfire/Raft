@@ -46,8 +46,7 @@ void Server::eventLoop() {
                     vector<std::future<RequestVoteResponse>> responses;
                     for (int ids = 0; ids < raft->num_servers; ids++) {
                         if (ids == serverId) continue;
-                        auto future = std::async(&Server::requestVoteRPC, raft->servers[ids], req, ids);
-                        responses.push_back(future);
+                        responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[ids], req, ids));
                     }
                     //use the .get() method on each future to get the response
                     int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
