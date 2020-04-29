@@ -3,25 +3,25 @@
 Raft::Raft(int num_servers): num_servers(num_servers) {
     // start the specified amount of servers(threads)
     for (int i=0; i<num_servers; i++) {
-        Server svr(i, this);
+        Server* svr = new Server(i, this);
         servers.push_back(svr);
     }
 
     for (int i=0; i<num_servers; i++) {
-        handles.push_back(std::thread(&Server::eventLoop, &servers[i]));
+        handles.push_back(std::thread(&Server::eventLoop, servers[i]));
     }
 }
 
 void Raft::crashServer(int serverId) {
     assert(serverId < num_servers);
 
-    servers[serverId].crash();
+    servers[serverId]->crash();
 }
 
 void Raft::restartServer(int serverId) {
     assert(serverId < num_servers);
 
-    servers[serverId].restart();
+    servers[serverId]->restart();
 }
 
 ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCommand) {

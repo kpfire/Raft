@@ -37,6 +37,8 @@ class Raft;
 class Server {
     private:
     //Own our variables
+    // lock
+    std::mutex myLock;
     //Use a boolean variable to mimic server crashes. If it is false, then the server should be not responding.
     bool online;
     // Interval to sleep between checking for requests, also factors into checking the election timeout at every execution

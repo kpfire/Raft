@@ -31,7 +31,7 @@ class Raft {
     
     public:
     // List of ervers
-    vector<Server> servers;
+    vector<Server*> servers;
 
     int num_servers;
     

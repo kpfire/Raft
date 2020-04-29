@@ -35,6 +35,7 @@ void Server::restart() {
 void Server::eventLoop() {
     while (true) {
         if (online) {
+            myLock.lock();
             //cout << "Server " << this->serverId << " is running..." << endl;
             if (state != Leader){
                 // Check election timeout value
@@ -102,6 +103,7 @@ void Server::eventLoop() {
                     appendEntriesRPC(-1, ids);
                 }
             }
+            myLock.unlock();
         }
         sleep(interval);
     }
@@ -127,6 +129,7 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
 // see Raft::clientRequest for an example
 
 void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResponse> && p) {
+    myLock.lock();
     AppendEntriesResponse response;
     
     if (request.leaderCommit == -1) {
@@ -171,9 +174,11 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     }
     convertToFollowerIfNecessary(request.term, response.term);
     p.set_value(response);
+    myLock.unlock();
 }
 
 void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> && p) {
+    myLock.lock();
     RequestVoteResponse response;
     response.term = currentTerm;
     response.voteGranted = false;
@@ -192,12 +197,14 @@ void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> 
     }
     convertToFollowerIfNecessary(request.term, response.term);
     p.set_value(response);
+    myLock.unlock();
 }
 
 void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResponse> && p) {
     // if this is not the leader, reject it and tell who the leader it
     // otherwise handle the message in a blocking manner (add to local log, send out replicate message to
     // other servers, and monitor incoming channels from other servers to see if it is done)
+    myLock.lock();
     ClientRequestResponse response;
     if (state != Leader) {
         response.succeed = false;
@@ -230,6 +237,7 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
         response.succeed = true;
     }
     p.set_value(response);
+    myLock.unlock();
 
     //The leader needs to replicate the message to other servers. So it should create separate threads for each OTHER server
     //and call "append" for each server
