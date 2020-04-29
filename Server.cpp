@@ -9,7 +9,7 @@ void Server::onServerStart() {
     // randomized election timeout
     //timeout = 5 + rand() % 5;
     // debug
-    timeout = 2 + (6 * serverId + 1);
+    timeout = 2 + (3 * serverId + 1);
     raft->syncCout("Server " + to_string(serverId) + " has timeout " + to_string(timeout));
     last_time = time_now();
     votedFor = -1; // instead of NULL
@@ -40,9 +40,9 @@ void Server::eventLoop() {
             if (state != Leader){
                 // Check election timeout value
                 double passed = time_passed(last_time);
-                raft->syncCout("Server " + to_string(serverId) + " passed " + to_string(passed) + " seconds since last reset");
+                //raft->syncCout("Server " + to_string(serverId) + " passed " + to_string(passed) + " seconds since last reset");
                 if (passed > timeout && votedFor == -1) {
-                    raft->syncCout("Election timer ran out on server " + to_string(serverId));
+                    raft->syncCout("!!! Election timer ran out on server " + to_string(serverId));
                     // Hold an election
                     auto election_start = time_now();
                     state = Candidate;
@@ -91,7 +91,7 @@ void Server::eventLoop() {
                     if (!won_election || state == Follower) continue;
                     else {
                         state = Leader;
-                        raft->syncCout("Server " + to_string(serverId) + "became the leader");
+                        raft->syncCout("Server " + to_string(serverId) + " became the leader");
                     }
                     last_time = time_now();                 
                 }
@@ -130,10 +130,16 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
 void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResponse> && p) {
     myLock.lock();
     AppendEntriesResponse response;
-    
+    if (!online) {
+        response.term = -1;
+        response.success = false;
+        p.set_value(response);
+        myLock.unlock();
+        return;
+    }
     if (request.leaderCommit == -1) {
         // This is just an empty heartbeat
-        raft->syncCout("Server " + to_string(serverId) + " received heartbeat from Server " + to_string(request.leaderId));
+        //raft->syncCout("Server " + to_string(serverId) + " received heartbeat from Server " + to_string(request.leaderId));
         response.success = true;
         response.term = -1;
     }
@@ -179,6 +185,13 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
 void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> && p) {
     myLock.lock();
     RequestVoteResponse response;
+    if (!online) {
+        response.term = -1;
+        response.voteGranted = false;
+        p.set_value(response);
+        myLock.unlock();
+        return;
+    }
     response.term = currentTerm;
     response.voteGranted = false;
     if (votedFor == -1 || votedFor == request.candidateId) {
