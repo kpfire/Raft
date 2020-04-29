@@ -6,7 +6,9 @@ void Server::onServerStart() {
     leaderId = -1;
     interval = 1; // seconds between checking for requests
     // randomized election timeout
-    timeout = 5 + rand() % 5;
+    //timeout = 5 + rand() % 5;
+    // debug
+    timeout = 2 + (6 * serverId + 1);
     cout << "Server " << serverId << " timeout " << timeout << endl;
     last_time = time_now();
     votedFor = -1; // instead of NULL
@@ -36,7 +38,6 @@ void Server::eventLoop() {
             if (state != Leader){
                 // Check election timeout value
                 double passed = time_passed(last_time);
-                cout << "Server " << serverId << " passed " << passed << " seconds";
                 if (passed > timeout && votedFor == -1) {
                     cout << "Election timer passed on server " << serverId << std::endl;
                     // Hold an election
@@ -48,9 +49,14 @@ void Server::eventLoop() {
                     RequestVote req = {currentTerm, serverId, commitIndex, log[commitIndex].first};
                     vector<std::future<RequestVoteResponse>> responses;
                     for (int ids = 0; ids < raft->num_servers; ids++) {
+                        cout << "Server " << serverId << " inside election loop " << ids << endl;
+                        cout << std::flush;
+                        sleep(1);
                         if (ids == serverId) continue;
                         responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[ids], req, ids));
                     }
+                    cout << "after pushing threads";
+                    sleep(1);
                     //use the .get() method on each future to get the response
                     int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
                     bool won_election = false;

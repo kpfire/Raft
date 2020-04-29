@@ -4,10 +4,10 @@ clean:
 	rm -f ./raft.o
 
 build: main.cpp Server.cpp Server.h Raft.cpp Raft.h utilities.h AppendEntries.h ClientRequest.h RequestVote.h
-	g++ main.cpp Server.cpp Server.h Raft.cpp Raft.h utilities.h AppendEntries.h ClientRequest.h RequestVote.h -pthread -o raft.o
+	g++ -pthread -o raft.o main.cpp Server.cpp Server.h Raft.cpp Raft.h utilities.h AppendEntries.h ClientRequest.h RequestVote.h
 
 debug: main.cpp Server.cpp Server.h Raft.cpp main.cpp utilities.h
-	g++ main.cpp Server.cpp Server.h Raft.cpp Raft.h utilities.h AppendEntries.h ClientRequest.h RequestVote.h -pthread -o raft.o
+	g++ -g -pthread -o raft.o main.cpp Server.cpp Server.h Raft.cpp Raft.h utilities.h AppendEntries.h ClientRequest.h RequestVote.h
 
 test: clean build
 	echo "testing given examples"
