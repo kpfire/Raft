@@ -35,15 +35,14 @@ struct pair_hash
 // Timing functions
 using namespace std::chrono;
 
-// Get current time
-static high_resolution_clock::time_point time_now() {
-	return high_resolution_clock::now();
+// Get current epoch time in seconds
+static double time_now() {
+	return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() / 1000.;
 }
 
-// Return time passed in seconds
-static double time_passed(high_resolution_clock::time_point t) {
-	auto time_span = duration_cast<duration<double>>(high_resolution_clock::now() - t);
-	return time_span.count();
+// Return time passed since t in seconds
+static double time_passed(double t) {
+	return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() / 1000. - t;
 }
 
 #endif

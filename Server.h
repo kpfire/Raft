@@ -44,7 +44,7 @@ class Server {
     // Election timeout limit in seconds
     double timeout;
     // Time at last execution loop, used for checking timeout;
-    chrono::high_resolution_clock::time_point last_time;
+    double last_time;
     // use a map to represent the state machine
     unordered_map<string, int> stateMachine;
     // server state

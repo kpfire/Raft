@@ -10,7 +10,7 @@ void Server::onServerStart() {
     //timeout = 5 + rand() % 5;
     // debug
     timeout = 2 + (6 * serverId + 1);
-    cout << "Server " << serverId << " timeout " << timeout << endl;
+    cout << "Server " << serverId << " has timeout " << timeout << endl;
     last_time = time_now();
     votedFor = -1; // instead of NULL
     // reset volatile variables because they are supposed to be lost
@@ -35,12 +35,13 @@ void Server::restart() {
 void Server::eventLoop() {
     while (true) {
         if (online) {
-            cout << "Server " << this->serverId << " is running..." << endl;
+            //cout << "Server " << this->serverId << " is running..." << endl;
             if (state != Leader){
                 // Check election timeout value
                 double passed = time_passed(last_time);
+                cout << "Server " << serverId << " passed " << passed << " seconds since last reset" << endl;
                 if (passed > timeout && votedFor == -1) {
-                    cout << "Election timer passed on server " << serverId << std::endl;
+                    cout << "Election timer ran out on server " << serverId << endl;
                     // Hold an election
                     auto election_start = time_now();
                     state = Candidate;
@@ -61,14 +62,9 @@ void Server::eventLoop() {
                     RequestVote req = {currentTerm, serverId, lastLogIndex, lastTerm};
                     vector<std::future<RequestVoteResponse>> responses;
                     for (int ids = 0; ids < raft->num_servers; ids++) {
-                        cout << "Server " << serverId << " inside election loop " << ids << endl;
-                        cout << std::flush;
-                        sleep(1);
                         if (ids == serverId) continue;
                         responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[ids], req, ids));
                     }
-                    cout << "after pushing threads";
-                    sleep(1);
                     //use the .get() method on each future to get the response
                     int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
                     bool won_election = false;
@@ -79,8 +75,11 @@ void Server::eventLoop() {
                             std::future<RequestVoteResponse>& f = *it;
                             if (f.wait_for(0ms) == std::future_status::ready) { // This thread is done running
                                 if (f.get().voteGranted == true) {
+                                    cout << "Server " << serverId << " received a vote!";
                                     collected_votes++;
-                                    if (collected_votes >= majority) won_election = true;
+                                    if (collected_votes >= majority) {
+                                        won_election = true;
+                                    }
                                 }
                                 it = responses.erase(it);
                             }
@@ -91,7 +90,7 @@ void Server::eventLoop() {
                     if (!won_election || state == Follower) continue;
                     else {
                         state = Leader;
-                        cout << "Server " << serverId << "became the leader" << std::endl ;
+                        cout << "Server " << serverId << "became the leader" << endl ;
                     }
                     last_time = time_now();                 
                 }
@@ -113,6 +112,7 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
     // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
     int maxTerm = max(requestTerm, responseTerm);
     if (maxTerm > currentTerm) {
+        cout << "Server " << serverId << " converted" << endl;
         currentTerm = maxTerm;
         state = Follower;
         // Reset votedFor only if it's a new leader
@@ -130,7 +130,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     
     if (request.leaderCommit == -1) {
         // This is just an empty heartbeat
-        cout << "Server " << serverId << "received heartbeat from Server " << request.leaderId << std::endl;
+        cout << "Server " << serverId << " received heartbeat from Server " << request.leaderId << endl;
         response.success = true;
         response.term = -1;
     }
@@ -168,9 +168,8 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         // infered logic (not in paper)
         leaderId = request.leaderId;
     }
-    p.set_value(response);
-
     convertToFollowerIfNecessary(request.term, response.term);
+    p.set_value(response);
 }
 
 void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> && p) {
@@ -190,8 +189,8 @@ void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> 
     if (response.voteGranted == true) {
         votedFor = request.candidateId;
     }
-    p.set_value(response);
     convertToFollowerIfNecessary(request.term, response.term);
+    p.set_value(response);
 }
 
 void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResponse> && p) {
@@ -262,17 +261,19 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
 AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicateTo) {
     AppendEntries request;
 
-    request.term = currentTerm;
-    request.leaderId = serverId;
-    request.prevLogIndex = replicateIndex - 1;
-    request.prevLogTerm = log[replicateIndex - 1].first;
-    request.entry = log[replicateIndex].second;
-    request.leaderCommit = commitIndex;
-    // Heartbeat message?
-    if (replicateIndex == -1) {
+    if (replicateIndex == -1) { // Heartbeat message
         request.leaderCommit = -1;
         request.term = currentTerm;
     }
+    else { // Normal message
+        request.prevLogTerm = log[replicateIndex - 1].first;
+        request.entry = log[replicateIndex].second;
+        request.leaderCommit = commitIndex;
+    }
+    request.term = currentTerm;
+    request.leaderId = serverId;
+    request.prevLogIndex = replicateIndex - 1;
+
     std::promise<AppendEntriesResponse> p;
     auto f = p.get_future();
     std::thread t(&Server::appendEntries, raft->servers[replicateTo], request, std::move(p));
