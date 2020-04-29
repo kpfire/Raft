@@ -42,3 +42,9 @@ ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCo
     t.join();
     return f.get();
 }
+
+void Raft::syncCout(string msg) {
+    outputLock.lock();
+    cout << msg << endl;
+    outputLock.unlock();
+}

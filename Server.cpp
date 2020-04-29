@@ -10,7 +10,7 @@ void Server::onServerStart() {
     //timeout = 5 + rand() % 5;
     // debug
     timeout = 2 + (6 * serverId + 1);
-    cout << "Server " << serverId << " has timeout " << timeout << endl;
+    raft->syncCout("Server " + to_string(serverId) + " has timeout " + to_string(timeout));
     last_time = time_now();
     votedFor = -1; // instead of NULL
     // reset volatile variables because they are supposed to be lost
@@ -21,7 +21,7 @@ void Server::onServerStart() {
     } else {
         while (nextIndex.size() < raft->num_servers) nextIndex.push_back(0);
     }
-    cout << "Server " << serverId << " is online" << endl;
+    raft->syncCout("Server " + to_string(serverId) + " is online");
 }
 
 void Server::crash() {
@@ -40,9 +40,9 @@ void Server::eventLoop() {
             if (state != Leader){
                 // Check election timeout value
                 double passed = time_passed(last_time);
-                cout << "Server " << serverId << " passed " << passed << " seconds since last reset" << endl;
+                raft->syncCout("Server " + to_string(serverId) + " passed " + to_string(passed) + " seconds since last reset");
                 if (passed > timeout && votedFor == -1) {
-                    cout << "Election timer ran out on server " << serverId << endl;
+                    raft->syncCout("Election timer ran out on server " + to_string(serverId));
                     // Hold an election
                     auto election_start = time_now();
                     state = Candidate;
@@ -76,7 +76,7 @@ void Server::eventLoop() {
                             std::future<RequestVoteResponse>& f = *it;
                             if (f.wait_for(0ms) == std::future_status::ready) { // This thread is done running
                                 if (f.get().voteGranted == true) {
-                                    cout << "Server " << serverId << " received a vote!";
+                                    raft->syncCout("Server " + to_string(serverId) + " received a vote!");
                                     collected_votes++;
                                     if (collected_votes >= majority) {
                                         won_election = true;
@@ -91,7 +91,7 @@ void Server::eventLoop() {
                     if (!won_election || state == Follower) continue;
                     else {
                         state = Leader;
-                        cout << "Server " << serverId << "became the leader" << endl ;
+                        raft->syncCout("Server " + to_string(serverId) + "became the leader");
                     }
                     last_time = time_now();                 
                 }
@@ -122,7 +122,6 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
     }
     // If we called this, it was from an RPC and we can reset the election timer
     last_time = time_now();
-    cout << "Resetting timeout on server " << serverId << endl;
 }
 
 // the caller of all below methods should invoke these rpc calls in a separate thread
@@ -134,7 +133,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     
     if (request.leaderCommit == -1) {
         // This is just an empty heartbeat
-        cout << "Server " << serverId << " received heartbeat from Server " << request.leaderId << endl;
+        raft->syncCout("Server " + to_string(serverId) + " received heartbeat from Server " + to_string(request.leaderId));
         response.success = true;
         response.term = -1;
     }
@@ -262,7 +261,7 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
         rollbackTo++;
     }
     // done
-    cout << "Leader " << serverId << " has replicated log entry " << replicateIndex << " to " << replicateTo << endl;
+    raft->syncCout("Leader " + to_string(serverId) + " has replicated log entry " + to_string(replicateIndex) + " to " + to_string(replicateTo));
     pthread_barrier_wait(&barriers[replicateIndex]);
 }
 

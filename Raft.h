@@ -26,6 +26,8 @@
 // It offers communication channels between threads.
 class Raft {
     private:
+    // output lock
+    std::mutex outputLock;
     // Threads for each server. Currently not being used.
     vector<std::thread> handles;
     
@@ -45,6 +47,9 @@ class Raft {
 
     // RPC functions run on the caller
     ClientRequestResponse clientRequestRPC(int requestedServer, string stationMachineCommand) ;
+
+    // Synchronous cout
+    void syncCout(string);
 
 };
 
