@@ -112,7 +112,7 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
     // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
     int maxTerm = max(requestTerm, responseTerm);
     if (maxTerm > currentTerm) {
-        cout << "Server " << serverId << " converted" << endl;
+        //cout << "Server " << serverId << " converted" << endl;
         currentTerm = maxTerm;
         state = Follower;
         // Reset votedFor only if it's a new leader
@@ -120,6 +120,7 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
     }
     // If we called this, it was from an RPC and we can reset the election timer
     last_time = time_now();
+    cout << "Resetting timeout on server " << serverId << endl;
 }
 
 // the caller of all below methods should invoke these rpc calls in a separate thread
