@@ -4,6 +4,7 @@ void Server::onServerStart() {
     online = true;
     state = Follower;
     leaderId = -1;
+    currentTerm = 0;
     interval = 1; // seconds between checking for requests
     // randomized election timeout
     //timeout = 5 + rand() % 5;
@@ -46,7 +47,18 @@ void Server::eventLoop() {
                     currentTerm += 1;
                     int collected_votes = 1; // votes for self
                     // Request votes from everyone but self
-                    RequestVote req = {currentTerm, serverId, commitIndex, log[commitIndex].first};
+                    int lastLogIndex;
+                    int lastTerm;
+                    if (log.size() == 0) {
+                        // Initial election
+                        lastLogIndex = 0;
+                        lastTerm = 0;
+                    }
+                    else {
+                        lastLogIndex = log.size() - 1;
+                        lastTerm = log[lastLogIndex].first;
+                    }
+                    RequestVote req = {currentTerm, serverId, lastLogIndex, lastTerm};
                     vector<std::future<RequestVoteResponse>> responses;
                     for (int ids = 0; ids < raft->num_servers; ids++) {
                         cout << "Server " << serverId << " inside election loop " << ids << endl;
@@ -165,14 +177,19 @@ void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> 
     RequestVoteResponse response;
     response.term = currentTerm;
     response.voteGranted = false;
-    if (request.term >= currentTerm) {
-        if (votedFor == -1 || votedFor == request.candidateId) {
-            if (request.lastLogIndex >= commitIndex && request.lastLogTerm >= log[commitIndex].first) {
+    if (votedFor == -1 || votedFor == request.candidateId) {
+        if (request.term > currentTerm) { // Candidate's term is more up to date
+            response.voteGranted = true;
+        }
+        else if (request.term == currentTerm) { // Candidate's term is same but log is longer
+            if (log.size() <= request.lastLogIndex) {
                 response.voteGranted = true;
             }
         }
     }
-    votedFor = request.candidateId;
+    if (response.voteGranted == true) {
+        votedFor = request.candidateId;
+    }
     p.set_value(response);
     convertToFollowerIfNecessary(request.term, response.term);
 }
