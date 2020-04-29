@@ -1,5 +1,9 @@
 StartRaft 3
+Sleep 5
 CrashServer 0
+Sleep 2
 RestartServer 0
+Sleep 2
 Request 1 X 2
+Sleep 2
 Request 1 X

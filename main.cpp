@@ -32,7 +32,12 @@ int main(int argc, char * argv[]) {
     {
         cout << "> ";
         //cout << cmd << endl;
-        if (cmd.rfind("StartRaft", 0) == 0) {
+        if (cmd.rfind("Sleep", 0) == 0) {
+            vector<string> parts;
+            split1(cmd, parts);
+            assert(parts.size() == 2);
+            sleep(stoi(parts[1]));
+        } else if (cmd.rfind("StartRaft", 0) == 0) {
             assert(raft == NULL);
             vector<string> parts;
             split1(cmd, parts);
