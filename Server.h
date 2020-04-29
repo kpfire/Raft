@@ -42,9 +42,9 @@ class Server {
     // Interval to sleep between checking for requests, also factors into checking the election timeout at every execution
     int interval;
     // Election timeout limit in seconds
-    float timeout;
+    double timeout;
     // Time at last execution loop, used for checking timeout;
-    clock_t last_time;
+    chrono::high_resolution_clock::time_point last_time;
     // use a map to represent the state machine
     unordered_map<string, int> stateMachine;
     // server state

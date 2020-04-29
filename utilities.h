@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <string>
 #include <iterator>
+#include <ctime>
+#include <ratio>
+#include <chrono>
 
 #ifndef UTILITIES
 #define UTILITIES
@@ -28,5 +31,19 @@ struct pair_hash
 		return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
 	}
 };
+
+// Timing functions
+using namespace std::chrono;
+
+// Get current time
+static high_resolution_clock::time_point time_now() {
+	return high_resolution_clock::now();
+}
+
+// Return time passed in seconds
+static double time_passed(high_resolution_clock::time_point t) {
+	auto time_span = duration_cast<duration<double>>(high_resolution_clock::now() - t);
+	return time_span.count();
+}
 
 #endif

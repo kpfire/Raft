@@ -27,8 +27,10 @@ Raft* raft = NULL;
 
 int main(int argc, char * argv[]) {
     string cmd;
+    cout << "> ";
     while (std::getline(std::cin, cmd))
     {
+        cout << "> ";
         //cout << cmd << endl;
         if (cmd.rfind("StartRaft", 0) == 0) {
             assert(raft == NULL);

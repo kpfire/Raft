@@ -7,7 +7,8 @@ void Server::onServerStart() {
     interval = 1; // seconds between checking for requests
     // randomized election timeout
     timeout = 5 + rand() % 5;
-    last_time = clock();
+    cout << "Server " << serverId << " timeout " << timeout << endl;
+    last_time = time_now();
     votedFor = -1; // instead of NULL
     // reset volatile variables because they are supposed to be lost
     commitIndex = 0;
@@ -34,10 +35,12 @@ void Server::eventLoop() {
             cout << "Server " << this->serverId << " is running..." << endl;
             if (state != Leader){
                 // Check election timeout value
-                float time_passed = (clock() - last_time)/CLOCKS_PER_SEC;
-                if (time_passed > timeout && votedFor != -1) {
+                double passed = time_passed(last_time);
+                cout << "Server " << serverId << " passed " << passed << " seconds";
+                if (passed > timeout && votedFor == -1) {
+                    cout << "Election timer passed on server " << serverId << std::endl;
                     // Hold an election
-                    float election_start = clock()/CLOCKS_PER_SEC;
+                    auto election_start = time_now();
                     state = Candidate;
                     currentTerm += 1;
                     int collected_votes = 1; // votes for self
@@ -52,7 +55,7 @@ void Server::eventLoop() {
                     int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
                     bool won_election = false;
                     // Collect votes asynchronously
-                    while(((clock()/CLOCKS_PER_SEC) - election_start) < timeout && !won_election) {
+                    while(time_passed(election_start) < timeout && !won_election) {
                         auto it = responses.begin();
                         while(it != responses.end() && !won_election) {
                             std::future<RequestVoteResponse>& f = *it;
@@ -70,8 +73,9 @@ void Server::eventLoop() {
                     if (!won_election || state == Follower) continue;
                     else {
                         state = Leader;
+                        cout << "Server " << serverId << "became the leader" << std::endl ;
                     }
-                    last_time = clock();                 
+                    last_time = time_now();                 
                 }
             }
             if (state == Leader) {
@@ -97,7 +101,7 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
         votedFor = -1;
     }
     // If we called this, it was from an RPC and we can reset the election timer
-    last_time = clock();
+    last_time = time_now();
 }
 
 // the caller of all below methods should invoke these rpc calls in a separate thread
@@ -108,6 +112,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     
     if (request.leaderCommit == -1) {
         // This is just an empty heartbeat
+        cout << "Server " << serverId << "received heartbeat from Server " << request.leaderId << std::endl;
         response.success = true;
         response.term = -1;
     }
@@ -233,18 +238,17 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
 // RPC functions run on the caller
 AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicateTo) {
     AppendEntries request;
+
+    request.term = currentTerm;
+    request.leaderId = serverId;
+    request.prevLogIndex = replicateIndex - 1;
+    request.prevLogTerm = log[replicateIndex - 1].first;
+    request.entry = log[replicateIndex].second;
+    request.leaderCommit = commitIndex;
     // Heartbeat message?
     if (replicateIndex == -1) {
         request.leaderCommit = -1;
         request.term = currentTerm;
-    }
-    else {
-        request.term = currentTerm;
-        request.leaderId = serverId;
-        request.prevLogIndex = replicateIndex - 1;
-        request.prevLogTerm = log[replicateIndex - 1].first;
-        request.entry = log[replicateIndex].second;
-        request.leaderCommit = commitIndex;
     }
     std::promise<AppendEntriesResponse> p;
     auto f = p.get_future();
