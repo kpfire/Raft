@@ -10,7 +10,6 @@ void Server::onServerStart() {
     //timeout = 5 + rand() % 5;
     // debug
     timeout = 2 + (3 * serverId + 1);
-    raft->syncCout("Server " + to_string(serverId) + " has timeout " + to_string(timeout));
     last_time = time_now();
     votedFor = -1; // instead of NULL
     // reset volatile variables because they are supposed to be lost
@@ -21,12 +20,13 @@ void Server::onServerStart() {
     } else {
         while (nextIndex.size() < raft->num_servers) nextIndex.push_back(0);
     }
-    raft->syncCout("Server " + to_string(serverId) + " is online");
+    raft->syncCout("Server " + to_string(serverId) + " is online with timeout "+ to_string(timeout));
 }
 
 void Server::crash() {
     myLock.lock();
     online = false;
+    raft->syncCout("Server " + to_string(serverId) + " crashed");
     myLock.unlock();
 }
 
@@ -138,12 +138,13 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     myLock.lock();
     AppendEntriesResponse response;
     if (!online) {
-        response.term = -1;
-        response.success = false;
+        response.responded = false;
         p.set_value(response);
         myLock.unlock();
         return;
     }
+
+    response.responded = true;
     if (request.leaderCommit == -1) {
         // This is just an empty heartbeat
         //raft->syncCout("Server " + to_string(serverId) + " received heartbeat from Server " + to_string(request.leaderId));
@@ -223,6 +224,7 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
     // if this is not the leader, reject it and tell who the leader it
     // otherwise handle the message in a blocking manner (add to local log, send out replicate message to
     // other servers, and monitor incoming channels from other servers to see if it is done)
+    raft->syncCout("server " + to_string(serverId) + " handles request " + request.key + (request.valueDelta == 0 ? "" : "+=" + to_string(request.valueDelta)));
     myLock.lock();
     ClientRequestResponse response;
     if (state != Leader) {
@@ -236,27 +238,26 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
         if (request.valueDelta == 0) {
             // since the delta is 0, we consider it as a query instead of an update
             response.message = request.key + "=" + to_string(stateMachine[request.key]);
-        } else 
-        {
+        } else {
             // delta != 0. We consider it as an update
             // If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
             log.push_back({currentTerm, {request.key, request.valueDelta}});
             int replicateIndex = log.size() - 1;
-            pthread_barrier_t mybarrier;
             // the min limit to the barrier is 1(current thread) + half of the threads that replicates to other servers
             // if num_servers = 5, then only TWO other servers needs to reply.
-            pthread_barrier_init(&mybarrier, NULL, 1 + raft->num_servers / 2);
-            barriers[replicateIndex] = mybarrier;
+            pthread_barrier_init(&barriers[replicateIndex], NULL, 1 + raft->num_servers / 2);
             for (int i=0; i<raft->num_servers; i++) {
                 if (i==serverId) continue;
-                std::thread(&Server::replicateLogEntry, this, replicateIndex, i);
+                std::async(&Server::replicateLogEntry, raft->servers[serverId], replicateIndex, i);
             }
             pthread_barrier_wait(&barriers[replicateIndex]);
+            raft->syncCout("Log entry " + to_string(replicateIndex) + " has been replicated");
         }
         response.succeed = true;
     }
     p.set_value(response);
     myLock.unlock();
+    raft->syncCout("done");
 
     //The leader needs to replicate the message to other servers. So it should create separate threads for each OTHER server
     //and call "append" for each server
@@ -264,24 +265,27 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
 
 // this models a thread running on the LEADER and it tries replicate certain log entry to one CERTAIN follower
 void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
+    raft->syncCout("Server " + to_string(serverId) + " runs replicateLogEntry(" + to_string(replicateIndex) + ", " + to_string(replicateTo) + ");");
     AppendEntriesResponse response = appendEntriesRPC(replicateIndex, replicateTo);
-    if (response.success) return;
-    // try previous entry
-    int rollbackTo = replicateIndex;
-    while (!response.success) {
-        --rollbackTo;
-        assert(rollbackTo >= 0);
-        response = appendEntriesRPC(rollbackTo, replicateTo);
-    } 
-    // now replicate again starting from rollbackTo+1
-    rollbackTo++;
-    while (rollbackTo < replicateIndex) {
-        response = appendEntriesRPC(replicateIndex, replicateTo);
-        assert(response.success);
+    if (response.responded && !response.success) {
+        // try previous entry
+        int rollbackTo = replicateIndex;
+        while (!response.success) {
+            --rollbackTo;
+            cout << rollbackTo << endl;
+            //assert(rollbackTo >= 0);
+            response = appendEntriesRPC(rollbackTo, replicateTo);
+        } 
+        // now replicate again starting from rollbackTo+1
         rollbackTo++;
+        while (rollbackTo < replicateIndex) {
+            response = appendEntriesRPC(replicateIndex, replicateTo);
+            //assert(response.success);
+            rollbackTo++;
+        }
+        // done
+        raft->syncCout("Leader " + to_string(serverId) + " has replicated log entry " + to_string(replicateIndex) + " to " + to_string(replicateTo));
     }
-    // done
-    raft->syncCout("Leader " + to_string(serverId) + " has replicated log entry " + to_string(replicateIndex) + " to " + to_string(replicateTo));
     pthread_barrier_wait(&barriers[replicateIndex]);
 }
 

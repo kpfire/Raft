@@ -15,6 +15,7 @@ struct AppendEntries {
 };
 
 struct AppendEntriesResponse {
+    bool responded;
     int term;
     bool success;
 };
