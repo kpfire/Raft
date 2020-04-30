@@ -1,1 +1,9 @@
-StartRaft 2
+StartRaft 3
+Sleep 5
+CrashServer 0
+Sleep 9
+RestartServer 0
+CrashServer 2
+CrashServer 1
+Sleep 13
+RestartServer 2
