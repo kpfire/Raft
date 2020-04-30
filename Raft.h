@@ -27,7 +27,7 @@
 class Raft {
     private:
     // output lock
-    std::mutex outputLock;
+    std::mutex* outputLock;
     // Threads for each server. Currently not being used.
     vector<std::thread> handles;
     
@@ -37,7 +37,7 @@ class Raft {
 
     int num_servers;
     
-    Raft(int totalServers);
+    Raft(int totalServers, std::mutex* outputLock);
 
     ~Raft() { }
 

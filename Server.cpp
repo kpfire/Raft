@@ -46,7 +46,7 @@ void Server::eventLoop() {
                 double passed = time_passed(last_time);
                 //raft->syncCout("Server " + to_string(serverId) + " passed " + to_string(passed) + " seconds since last reset");
                 if (passed > timeout && votedFor == -1) {
-                    raft->syncCout("!!! Election timer ran out on server " + to_string(serverId));
+                    raft->syncCout("Server " + to_string(serverId) + " initiates an election with term = " + to_string(currentTerm+1));
                     // Hold an election
                     auto election_start = time_now();
                     state = Candidate;
@@ -117,12 +117,13 @@ void Server::eventLoop() {
 }
 
 
-void Server::convertToFollowerIfNecessary(int requestTerm, int responseTerm) {
+void Server::convertToFollowerIfNecessary(int requestTerm, int requestLeaderId) {
     // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
-    int maxTerm = max(requestTerm, responseTerm);
-    if (maxTerm > currentTerm) {
+    // However, after checking our code, there is no way to have this: response.term > currentTerm
+    if (requestTerm > currentTerm) {
         //cout << "Server " << serverId << " converted" << endl;
-        currentTerm = maxTerm;
+        currentTerm = requestTerm;
+        leaderId = requestLeaderId;
         state = Follower;
         // Reset votedFor only if it's a new leader
         votedFor = -1;
@@ -159,13 +160,10 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         // Reply false if term < currentTerm (§5.1)
         response.success = false;
         response.term = currentTerm;
-        raft->syncCout("appendEntries failed case 1");
     } else if (request.prevLogIndex >=0 && (request.prevLogIndex >= log.size() || log[request.prevLogIndex].first != request.prevLogTerm)) {
         //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
         response.success = false;
         response.term = currentTerm;
-        cout << request.prevLogIndex << " ," << log.size();
-        raft->syncCout("appendEntries failed case 2");
     } else {
         // If an existing entry conflicts with a new one (same index but different terms), 
         // delete the existing entry and all that follow it (§5.3)
@@ -192,7 +190,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         // infered logic (not in paper)
         leaderId = request.leaderId;
     }
-    convertToFollowerIfNecessary(request.term, response.term);
+    convertToFollowerIfNecessary(request.term, request.leaderId);
     p.set_value(response);
     myLock.unlock();
 }
@@ -222,7 +220,7 @@ void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> 
     if (response.voteGranted == true) {
         votedFor = request.candidateId;
     }
-    convertToFollowerIfNecessary(request.term, response.term);
+    convertToFollowerIfNecessary(request.term, request.candidateId);
     p.set_value(response);
     myLock.unlock();
 }
@@ -231,7 +229,7 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
     // if this is not the leader, reject it and tell who the leader it
     // otherwise handle the message in a blocking manner (add to local log, send out replicate message to
     // other servers, and monitor incoming channels from other servers to see if it is done)
-    raft->syncCout("server " + to_string(serverId) + " handles request " + request.key + (request.valueDelta == 0 ? "" : "+=" + to_string(request.valueDelta)));
+    //raft->syncCout("server " + to_string(serverId) + " handles request " + request.key + (request.valueDelta == 0 ? "" : "+=" + to_string(request.valueDelta)));
     myLock.lock();
     ClientRequestResponse response;
     if (state != Leader) {
@@ -270,7 +268,6 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
     }
     p.set_value(response);
     myLock.unlock();
-    raft->syncCout("done");
 
     //The leader needs to replicate the message to other servers. So it should create separate threads for each OTHER server
     //and call "append" for each server
@@ -278,14 +275,13 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
 
 // this models a thread running on the LEADER and it tries replicate certain log entry to one CERTAIN follower
 void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
-    raft->syncCout("Server " + to_string(serverId) + " runs replicateLogEntry(" + to_string(replicateIndex) + ", " + to_string(replicateTo) + ");");
+    //raft->syncCout("Server " + to_string(serverId) + " runs replicateLogEntry(" + to_string(replicateIndex) + ", " + to_string(replicateTo) + ");");
     AppendEntriesResponse response = appendEntriesRPC(replicateIndex, replicateTo);
     if (response.responded && !response.success) {
         // try previous entry
         int rollbackTo = replicateIndex;
         while (!response.success) {
             --rollbackTo;
-            cout << rollbackTo << endl;
             //assert(rollbackTo >= 0);
             response = appendEntriesRPC(rollbackTo, replicateTo);
         } 
@@ -297,7 +293,7 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
             rollbackTo++;
         }
         // done
-        raft->syncCout("Leader " + to_string(serverId) + " has replicated log entry " + to_string(replicateIndex) + " to " + to_string(replicateTo));
+        raft->syncCout("Server " + to_string(replicateTo) + " synchronized its log from server " + to_string(serverId) + " (index of last log entry = " + to_string(replicateIndex) + ")");
     }
     barriers[replicateIndex]->notify(serverId);
 }

@@ -1,6 +1,6 @@
 #include "Raft.h"
 
-Raft::Raft(int num_servers): num_servers(num_servers) {
+Raft::Raft(int num_servers, std::mutex* outputLock): num_servers(num_servers), outputLock(outputLock) {
     // start the specified amount of servers(threads)
     for (int i=0; i<num_servers; i++) {
         Server* svr = new Server(i, this);
@@ -44,7 +44,7 @@ ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCo
 }
 
 void Raft::syncCout(string msg) {
-    outputLock.lock();
+    outputLock->lock();
     cout << msg << endl;
-    outputLock.unlock();
+    outputLock->unlock();
 }

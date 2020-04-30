@@ -23,15 +23,16 @@
 
 using namespace std;
 
+std::mutex outputLock;
 Raft* raft = NULL;
 
 int main(int argc, char * argv[]) {
     string cmd;
-    cout << "> ";
     while (std::getline(std::cin, cmd))
     {
-        cout << "> ";
-        //cout << cmd << endl;
+        outputLock.lock();
+        cout << "$> " << cmd << endl;
+        outputLock.unlock();
         if (cmd.rfind("Sleep", 0) == 0) {
             vector<string> parts;
             split1(cmd, parts);
@@ -42,7 +43,7 @@ int main(int argc, char * argv[]) {
             vector<string> parts;
             split1(cmd, parts);
             assert(parts.size() == 2);
-            raft = new Raft(stoi(parts[1]));
+            raft = new Raft(stoi(parts[1]), &outputLock);
         } else if (cmd.rfind("CrashServer", 0) == 0) {
             assert(raft != NULL);
             vector<string> parts;
@@ -70,7 +71,11 @@ int main(int argc, char * argv[]) {
             }
             // client ask requestedServer to perform stationMachineCommand
             ClientRequestResponse response = raft->clientRequestRPC(requestedServer, stationMachineCommand);
-            cout << "Server " << requestedServer << " responded: " << response.message << endl;
+            if (response.message.size() > 0) {
+                outputLock.lock();
+                cout << "Response: " << response.message << endl;
+                outputLock.unlock();
+            }
         } 
         // else {
             // cout << "Invalid command" << endl;
