@@ -70,7 +70,11 @@ void Server::eventLoop() {
                     int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
                     bool won_election = false;
                     // Collect votes asynchronously
-                    while(time_passed(election_start) < timeout && !won_election) {
+                    while(!won_election) {
+                        if (time_passed(election_start) < timeout) {
+                            raft->syncCout("Election on server " + to_string(serverId) + " timed out!");
+                            break;
+                        }
                         auto it = responses.begin();
                         while(it != responses.end() && !won_election) {
                             std::future<RequestVoteResponse>& f = *it;
