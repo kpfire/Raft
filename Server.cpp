@@ -75,7 +75,7 @@ void Server::eventLoop() {
                     bool won_election = false;
                     // Collect votes asynchronously
                     while(!won_election) {
-                        if (time_passed(election_start) < timeout) {
+                        if (time_passed(election_start) > timeout) {
                             raft->syncCout("Election on server " + to_string(serverId) + " timed out!");
                             break;
                         }
@@ -95,9 +95,8 @@ void Server::eventLoop() {
                             else ++it;
                         }
                     }
-                    // Also recheck if state was reset before winning election
-                    if (!won_election || state == Follower) continue;
-                    else {
+                    // Also recheck if state was reset by a new leader before winning election
+                    if (won_election && state != Follower) {
                         state = Leader;
                         raft->syncCout("Server " + to_string(serverId) + " became the leader");
                     }
