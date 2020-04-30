@@ -25,17 +25,21 @@ void Server::onServerStart() {
 }
 
 void Server::crash() {
+    myLock.lock();
     online = false;
+    myLock.unlock();
 }
 
 void Server::restart() {
+    myLock.lock();
     onServerStart();
+    myLock.unlock();
 }
 
 void Server::eventLoop() {
     while (true) {
-        if (online) {
-            myLock.lock();
+        myLock.lock();
+        if (online) {            
             //cout << "Server " << this->serverId << " is running..." << endl;
             if (state != Leader){
                 // Check election timeout value
@@ -106,9 +110,9 @@ void Server::eventLoop() {
                     if (ids == serverId) continue;
                     appendEntriesRPC(-1, ids);
                 }
-            }
-            myLock.unlock();
+            }            
         }
+        myLock.unlock();
         sleep(interval);
     }
 }
