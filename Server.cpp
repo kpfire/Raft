@@ -155,10 +155,13 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         // Reply false if term < currentTerm (§5.1)
         response.success = false;
         response.term = currentTerm;
-    } else if (request.prevLogIndex >= log.size() || log[request.prevLogIndex].first != request.prevLogTerm) {
+        raft->syncCout("appendEntries failed case 1");
+    } else if (request.prevLogIndex >=0 && (request.prevLogIndex >= log.size() || log[request.prevLogIndex].first != request.prevLogTerm)) {
         //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
         response.success = false;
         response.term = currentTerm;
+        cout << request.prevLogIndex << " ," << log.size();
+        raft->syncCout("appendEntries failed case 2");
     } else {
         // If an existing entry conflicts with a new one (same index but different terms), 
         // delete the existing entry and all that follow it (§5.3)
@@ -245,13 +248,19 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
             int replicateIndex = log.size() - 1;
             // the min limit to the barrier is 1(current thread) + half of the threads that replicates to other servers
             // if num_servers = 5, then only TWO other servers needs to reply.
-            pthread_barrier_init(&barriers[replicateIndex], NULL, 1 + raft->num_servers / 2);
+            barriers[replicateIndex] = new Semaphore(1 + raft->num_servers / 2);
             for (int i=0; i<raft->num_servers; i++) {
                 if (i==serverId) continue;
                 std::async(&Server::replicateLogEntry, raft->servers[serverId], replicateIndex, i);
             }
-            pthread_barrier_wait(&barriers[replicateIndex]);
+            barriers[replicateIndex]->notify(serverId);
+            barriers[replicateIndex]->wait(serverId);
             raft->syncCout("Log entry " + to_string(replicateIndex) + " has been replicated");
+
+            // ideally, below lines should execute atomically
+            stateMachine[request.key] += request.valueDelta;
+            lastApplied = log.size() - 1;
+            commitIndex = lastApplied + 1;
         }
         response.succeed = true;
     }
@@ -286,7 +295,7 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
         // done
         raft->syncCout("Leader " + to_string(serverId) + " has replicated log entry " + to_string(replicateIndex) + " to " + to_string(replicateTo));
     }
-    pthread_barrier_wait(&barriers[replicateIndex]);
+    barriers[replicateIndex]->notify(serverId);
 }
 
 // RPC functions run on the caller

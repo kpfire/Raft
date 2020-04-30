@@ -26,6 +26,7 @@
 #include "AppendEntries.h"
 #include "RequestVote.h"
 #include "ClientRequest.h"
+#include "Semaphore.h"
 
 using namespace std;
 
@@ -54,7 +55,7 @@ class Server {
     // the current id of leader
     int leaderId;
     // barriers to replicate each log entry
-    unordered_map<int, pthread_barrier_t> barriers;
+    unordered_map<int, Semaphore*> barriers;
 
     Raft* raft;
 
