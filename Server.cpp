@@ -4,7 +4,7 @@ void Server::onServerStart() {
     online = true;
     state = Follower;
     leaderId = -1;
-    currentTerm = 0;
+    currentTerm = -1;
     interval = 1; // seconds between checking for requests
     // randomized election timeout
     //timeout = 5 + rand() % 5;
@@ -148,6 +148,10 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     if (request.leaderCommit == -1) {
         // This is just an empty heartbeat
         //raft->syncCout("Server " + to_string(serverId) + " received heartbeat from Server " + to_string(request.leaderId));
+        if (currentTerm == -1) {
+            // We were initialized and need to know the current leader
+            leaderId = request.leaderId;
+        }
         response.success = true;
         response.term = -1;
     }
