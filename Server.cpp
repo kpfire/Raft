@@ -152,6 +152,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         if (currentTerm == -1) {
             // We were initialized and need to know the current leader
             leaderId = request.leaderId;
+            currentTerm = request.term;
         }
         response.success = true;
         response.term = -1;

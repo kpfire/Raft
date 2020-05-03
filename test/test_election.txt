@@ -7,3 +7,4 @@ CrashServer 2
 CrashServer 1
 Sleep 13
 RestartServer 2
+Sleep 10
