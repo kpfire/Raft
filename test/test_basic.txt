@@ -1,0 +1,16 @@
+StartRaft 5
+Sleep 5
+CrashServer 0
+Sleep 7
+RestartServer 0
+Sleep 3
+CrashServer 1
+Sleep 5
+Request 0 X 10
+Request 0 X -5
+Request 1 X
+Sleep 3
+CrashServer 0
+Sleep 7
+RestartServer 0
+Sleep 3
