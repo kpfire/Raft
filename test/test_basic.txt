@@ -11,10 +11,13 @@ Sleep 1
 Request 0 X -5
 Sleep 1
 Request 0 X
-Sleep 1
-Request 1 X
 Sleep 3
+Request 1 X
+Sleep 1
+RestartServer 1
+Sleep 3
+Request 1 X
+Sleep 1
 CrashServer 0
 Sleep 7
 RestartServer 0
-Sleep 3

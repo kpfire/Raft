@@ -233,7 +233,11 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
     //raft->syncCout("server " + to_string(serverId) + " handles request " + request.key + (request.valueDelta == 0 ? "" : "+=" + to_string(request.valueDelta)));
     myLock.lock();
     ClientRequestResponse response;
-    if (state != Leader) {
+    if (!online) {
+        response.succeed = false;
+        response.message = "Server " + to_string(serverId) + " is offline";
+    }
+    else if (state != Leader) {
         response.succeed = false;
         if (leaderId >= 0) {
             response.message = "Please contact server " + to_string(leaderId);
