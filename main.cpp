@@ -85,8 +85,19 @@ int main(int argc, char * argv[]) {
             vector<string> parts;
             split1(cmd, parts);
             assert(parts.size() == 2);
-            string partitions = parts[1];
-            //raft->partition(parts[1]);
+            vector<string> groups;
+            split2("}," + parts[1] + ",{", "},{", groups);
+            vector<vector<int>> partitions;
+            for (string& group: groups) {
+                if (group.length() == 0) continue;
+                partitions.push_back(vector<int>());
+                vector<string> servers;
+                split2(group, ",", servers);
+                for(int i=0; i<servers.size(); i++) {
+                    partitions.back().push_back(stoi(servers[i]));
+                }
+            }
+            raft->partition(partitions);
         } 
         // else {
             // cout << "Invalid command" << endl;

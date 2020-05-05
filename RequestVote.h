@@ -13,6 +13,7 @@ struct RequestVote {
 };
 
 struct RequestVoteResponse {
+    bool responded;
     int term;
     bool voteGranted;
 };

@@ -24,6 +24,18 @@ void Raft::restartServer(int serverId) {
     servers[serverId]->restart();
 }
 
+void Raft::partition(vector<vector<int>> partitions) {
+    for (int i=0; i<partitions.size(); i++) {
+        for (int server: partitions[i]) {
+            serverPartition[server] = i;
+        }
+    }
+}
+
+bool Raft::belongToSamePartition(int server1, int server2) {
+    return serverPartition[server1] == serverPartition[server2];
+}
+
 ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCommand) {
     assert(serverId < num_servers);
     vector<string> parts;

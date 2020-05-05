@@ -1,0 +1,12 @@
+StartRaft 5
+Sleep 5
+Request 0 X
+Partition {0,1},{2,3,4}
+Request 0 X
+Sleep 10
+Partition {0,1,2,3,4}
+Request 0 X
+Sleep 10
+Request 0 X
+Sleep 2
+Request 2 X

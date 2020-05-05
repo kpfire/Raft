@@ -83,7 +83,8 @@ void Server::eventLoop() {
                         while(it != responses.end() && !won_election) {
                             std::future<RequestVoteResponse>& f = *it;
                             if (f.wait_for(0ms) == std::future_status::ready) { // This thread is done running
-                                if (f.get().voteGranted == true) {
+                                RequestVoteResponse r = f.get();
+                                if (r.responded && r.voteGranted) {
                                     raft->syncCout("Server " + to_string(serverId) + " received a vote!");
                                     collected_votes++;
                                     if (collected_votes >= majority) {
@@ -210,12 +211,12 @@ void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> 
     myLock.lock();
     RequestVoteResponse response;
     if (!online) {
-        response.term = -1;
-        response.voteGranted = false;
+        response.responded = false;
         p.set_value(response);
         myLock.unlock();
         return;
     }
+    response.responded = true;
     response.term = currentTerm;
     response.voteGranted = false;
     if (votedFor == -1 || votedFor == request.candidateId) {
@@ -318,6 +319,12 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
 
 // RPC functions run on the caller
 AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicateTo) {
+    if (!raft->belongToSamePartition(serverId, replicateTo)) {
+        AppendEntriesResponse response;
+        response.responded = false;
+        return response;
+    }
+
     AppendEntries request;
 
     if (replicateIndex == -1) { // Heartbeat message
@@ -342,6 +349,12 @@ AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicate
 
 // RPC functions run on the caller
 RequestVoteResponse Server::requestVoteRPC(RequestVote request, int sendTo) {
+    if (!raft->belongToSamePartition(serverId, sendTo)) {
+        RequestVoteResponse response;
+        response.responded = false;
+        return response;
+    }
+
     std::promise<RequestVoteResponse> p;
     auto f = p.get_future();
     std::thread t(&Server::requestVote, raft->servers[sendTo], request, std::move(p));

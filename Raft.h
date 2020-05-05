@@ -30,6 +30,8 @@ class Raft {
     std::mutex* outputLock;
     // Threads for each server. Currently not being used.
     vector<std::thread> handles;
+
+    unordered_map<int, int> serverPartition;
     
     public:
     // List of ervers
@@ -44,6 +46,10 @@ class Raft {
     void crashServer(int serverId);
 
     void restartServer(int serverId);
+
+    void partition(vector<vector<int>> partitions);
+
+    bool belongToSamePartition(int server1, int server2);
 
     // RPC functions run on the caller
     ClientRequestResponse clientRequestRPC(int requestedServer, string stationMachineCommand) ;
