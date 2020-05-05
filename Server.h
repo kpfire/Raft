@@ -105,6 +105,8 @@ class Server {
     RequestVoteResponse requestVoteRPC(RequestVote, int);
 
     AppendEntriesResponse appendEntriesRPC(int, int);
+
+    AppendEntriesResponse repeatedlyAppendEntries(int, int);
 };
 
 #endif

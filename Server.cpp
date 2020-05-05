@@ -39,7 +39,7 @@ void Server::restart() {
 void Server::eventLoop() {
     while (true) {
         myLock.lock();
-        if (online) {            
+        if (online) {
             //cout << "Server " << this->serverId << " is running..." << endl;
             if (state != Leader){
                 // Check election timeout value
@@ -108,7 +108,7 @@ void Server::eventLoop() {
                 // send out heartbeat
                 for (int ids = 0; ids < raft->num_servers; ids++) {
                     if (ids == serverId) continue;
-                    appendEntriesRPC(-1, ids);
+                    repeatedlyAppendEntries(-1, ids);
                 }
             }            
         }
@@ -295,19 +295,19 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
 // this models a thread running on the LEADER and it tries replicate certain log entry to one CERTAIN follower
 void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
     //raft->syncCout("Server " + to_string(serverId) + " runs replicateLogEntry(" + to_string(replicateIndex) + ", " + to_string(replicateTo) + ");");
-    AppendEntriesResponse response = appendEntriesRPC(replicateIndex, replicateTo);
+    AppendEntriesResponse response = repeatedlyAppendEntries(replicateIndex, replicateTo);
     if (response.responded && !response.success) {
         // try previous entry
         int rollbackTo = replicateIndex;
         while (!response.success) {
             --rollbackTo;
             //assert(rollbackTo >= 0);
-            response = appendEntriesRPC(rollbackTo, replicateTo);
+            response = repeatedlyAppendEntries(rollbackTo, replicateTo);
         } 
         // now replicate again starting from rollbackTo+1
         rollbackTo++;
         while (rollbackTo < replicateIndex) {
-            response = appendEntriesRPC(replicateIndex, replicateTo);
+            response = repeatedlyAppendEntries(replicateIndex, replicateTo);
             //assert(response.success);
             rollbackTo++;
         }
@@ -317,8 +317,25 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
     barriers[replicateIndex]->notify(serverId);
 }
 
+// run appendEntriesRPC for at most 10 times to account for dropout
+AppendEntriesResponse Server::repeatedlyAppendEntries(int replicateIndex, int replicateTo) {
+    AppendEntriesResponse response;
+    for (int i=0; i<10; i++) {
+        response = appendEntriesRPC(replicateIndex, replicateTo);
+        if (response.responded) return response;
+    }
+    return response;
+}
+
 // RPC functions run on the caller
 AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicateTo) {
+    if (raft->dropoutHappens()) {
+        //raft->syncCout("Dropout appendEntries from " + to_string(serverId) + " to " + to_string(replicateTo));
+        AppendEntriesResponse response;
+        response.responded = false;
+        return response;
+    }
+    
     if (!raft->belongToSamePartition(serverId, replicateTo)) {
         AppendEntriesResponse response;
         response.responded = false;
@@ -344,11 +361,26 @@ AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicate
     auto f = p.get_future();
     std::thread t(&Server::appendEntries, raft->servers[replicateTo], request, std::move(p));
     t.join();
+
+    if (raft->dropoutHappens()) {
+        //raft->syncCout("Dropout appendEntries response from " + to_string(replicateTo) + " to " + to_string(serverId));
+        AppendEntriesResponse response;
+        response.responded = false;
+        return response;
+    }
+
     return f.get();
 }
 
 // RPC functions run on the caller
 RequestVoteResponse Server::requestVoteRPC(RequestVote request, int sendTo) {
+    if (raft->dropoutHappens()) {
+        //raft->syncCout("Dropout requestVote from " + to_string(serverId) + " to " + to_string(sendTo));
+        RequestVoteResponse response;
+        response.responded = false;
+        return response;
+    }
+    
     if (!raft->belongToSamePartition(serverId, sendTo)) {
         RequestVoteResponse response;
         response.responded = false;
@@ -359,5 +391,13 @@ RequestVoteResponse Server::requestVoteRPC(RequestVote request, int sendTo) {
     auto f = p.get_future();
     std::thread t(&Server::requestVote, raft->servers[sendTo], request, std::move(p));
     t.join();
+
+    if (raft->dropoutHappens()) {
+        //raft->syncCout("Dropout requestVote response from " + to_string(sendTo) + " to " + to_string(serverId));
+        RequestVoteResponse response;
+        response.responded = false;
+        return response;
+    }
+
     return f.get();
 }

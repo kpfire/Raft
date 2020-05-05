@@ -32,6 +32,7 @@ class Raft {
     vector<std::thread> handles;
 
     unordered_map<int, int> serverPartition;
+    double dropoutProbability = .0;
     
     public:
     // List of ervers
@@ -50,6 +51,10 @@ class Raft {
     void partition(vector<vector<int>> partitions);
 
     bool belongToSamePartition(int server1, int server2);
+
+    void setDropoutProbability(double p);
+
+    bool dropoutHappens();
 
     // RPC functions run on the caller
     ClientRequestResponse clientRequestRPC(int requestedServer, string stationMachineCommand) ;

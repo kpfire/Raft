@@ -98,6 +98,13 @@ int main(int argc, char * argv[]) {
                 }
             }
             raft->partition(partitions);
+        }  else if (cmd.rfind("Dropout", 0) == 0) {
+            assert(raft != NULL);
+            vector<string> parts;
+            split1(cmd, parts);
+            assert(parts.size() == 2);
+            double dropoutProbability = stod(parts[1]);
+            raft->setDropoutProbability(dropoutProbability);
         } 
         // else {
             // cout << "Invalid command" << endl;

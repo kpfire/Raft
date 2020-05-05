@@ -36,7 +36,23 @@ bool Raft::belongToSamePartition(int server1, int server2) {
     return serverPartition[server1] == serverPartition[server2];
 }
 
+void Raft::setDropoutProbability(double p){
+    dropoutProbability = p;
+}
+
+bool Raft::dropoutHappens() {
+    int r = rand() % 1000;
+    return r / 1000. < dropoutProbability;
+}
+
 ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCommand) {
+    if (dropoutHappens()) {
+        //syncCout("Dropout clientRequest to " + to_string(serverId));
+        ClientRequestResponse response;
+        response.responded = false;
+        return response;
+    }
+
     assert(serverId < num_servers);
     vector<string> parts;
     split1(stateMachineCommand, parts);
@@ -53,6 +69,14 @@ ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCo
     auto f = p.get_future();
     std::thread t(&Server::clientRequest, servers[serverId], request, std::move(p));
     t.join();
+
+    if (dropoutHappens()) {
+        //syncCout("Dropout clientRequest response from " + to_string(serverId));
+        ClientRequestResponse response;
+        response.responded = false;
+        return response;
+    }
+
     return f.get();
 }
 
