@@ -324,7 +324,7 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
 // run appendEntriesRPC for at most 10 times to account for dropout
 AppendEntriesResponse Server::repeatedlyAppendEntries(int replicateIndex, int replicateTo) {
     AppendEntriesResponse response;
-    for (int i=0; i<10; i++) {
+    for (int i=0; i<raft->retry_times; i++) {
         response = appendEntriesRPC(replicateIndex, replicateTo);
         if (response.responded) return response;
     }

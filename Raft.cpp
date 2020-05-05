@@ -40,6 +40,9 @@ bool Raft::belongToSamePartition(int server1, int server2) {
 
 void Raft::setDropoutProbability(double p){
     dropoutProbability = p;
+    // Be 99.99% confident that communication between 2 online servers will eventually succeed if we try retry_times times
+    retry_times = max(1, (int)(log(0.0001) / log(p)));
+    //syncCout("Set retry_times=" + to_string(retry_times));
 }
 
 bool Raft::dropoutHappens() {
@@ -49,12 +52,13 @@ bool Raft::dropoutHappens() {
 }
 
 ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCommand) {
-    if (dropoutHappens()) {
+    // assume no dropout when handling client request
+    /*if (dropoutHappens()) {
         //syncCout("Dropout clientRequest to " + to_string(serverId));
         ClientRequestResponse response;
         response.responded = false;
         return response;
-    }
+    }*/
 
     assert(serverId < num_servers);
     vector<string> parts;
@@ -73,12 +77,12 @@ ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCo
     std::thread t(&Server::clientRequest, servers[serverId], request, std::move(p));
     t.join();
 
-    if (dropoutHappens()) {
+    /*if (dropoutHappens()) {
         //syncCout("Dropout clientRequest response from " + to_string(serverId));
         ClientRequestResponse response;
         response.responded = false;
         return response;
-    }
+    }*/
 
     return f.get();
 }

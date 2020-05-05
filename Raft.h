@@ -39,6 +39,9 @@ class Raft {
     vector<Server*> servers;
 
     int num_servers;
+
+    // Assume after trying for retry_times times, communication between two ONLINE servers will eventualy succeed
+    int retry_times = 1;
     
     Raft(int totalServers, std::mutex* outputLock);
 
