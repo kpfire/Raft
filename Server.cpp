@@ -186,7 +186,17 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         //If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine (§5.3)
         while (commitIndex > lastApplied) {
             lastApplied++;
-            stateMachine[log[lastApplied].second.first] += log[lastApplied].second.second;
+            vector<string> parts;
+            if (log[lastApplied].second.find("+=") != string::npos) {
+                split2(log[lastApplied].second, "+=", parts);
+            } else if (log[lastApplied].second.find("-=") != string::npos) {
+                split2(log[lastApplied].second, "-=", parts);
+            } else {
+                //config change logic here
+                assert(false);
+            }
+            
+            stateMachine[parts[0]] += stoi(parts[1]);
         }
         // infered logic (not in paper)
         leaderId = request.leaderId;
@@ -234,42 +244,45 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
     myLock.lock();
     ClientRequestResponse response;
     if (!online) {
-        response.succeed = false;
-        response.message = "Server " + to_string(serverId) + " is offline";
+        response.responded = false;
     }
-    else if (state != Leader) {
-        response.succeed = false;
-        if (leaderId >= 0) {
-            response.message = "Please contact server " + to_string(leaderId);
-        } else {
-            response.message = "Please try again later";
-        }
-    } else {
-        if (request.valueDelta == 0) {
-            // since the delta is 0, we consider it as a query instead of an update
-            response.message = request.key + "=" + to_string(stateMachine[request.key]);
-        } else {
-            // delta != 0. We consider it as an update
-            // If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
-            log.push_back({currentTerm, {request.key, request.valueDelta}});
-            int replicateIndex = log.size() - 1;
-            // the min limit to the barrier is 1(current thread) + half of the threads that replicates to other servers
-            // if num_servers = 5, then only TWO other servers needs to reply.
-            barriers[replicateIndex] = new Semaphore(1 + raft->num_servers / 2);
-            for (int i=0; i<raft->num_servers; i++) {
-                if (i==serverId) continue;
-                std::async(&Server::replicateLogEntry, raft->servers[serverId], replicateIndex, i);
+    else{
+        response.responded = true;
+        if (state != Leader) {
+            response.succeed = false;
+            if (leaderId >= 0) {
+                response.message = "Please contact server " + to_string(leaderId);
+            } else {
+                response.message = "Please try again later";
             }
-            barriers[replicateIndex]->notify(serverId);
-            barriers[replicateIndex]->wait(serverId);
-            raft->syncCout("Log entry " + to_string(replicateIndex) + " has been replicated");
+        } else {
+            if (request.valueDelta == 0) {
+                // since the delta is 0, we consider it as a query instead of an update
+                response.message = request.key + "=" + to_string(stateMachine[request.key]);
+            } else {
+                // delta != 0. We consider it as an update
+                // If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
+                string operation = request.key + "+=" + to_string(request.valueDelta);
+                log.push_back({currentTerm, operation});
+                int replicateIndex = log.size() - 1;
+                // the min limit to the barrier is 1(current thread) + half of the threads that replicates to other servers
+                // if num_servers = 5, then only TWO other servers needs to reply.
+                barriers[replicateIndex] = new Semaphore(1 + raft->num_servers / 2);
+                for (int i=0; i<raft->num_servers; i++) {
+                    if (i==serverId) continue;
+                    std::async(&Server::replicateLogEntry, raft->servers[serverId], replicateIndex, i);
+                }
+                barriers[replicateIndex]->notify(serverId);
+                barriers[replicateIndex]->wait(serverId);
+                raft->syncCout("Log entry " + to_string(replicateIndex) + " has been replicated");
 
-            // ideally, below lines should execute atomically
-            stateMachine[request.key] += request.valueDelta;
-            lastApplied = log.size() - 1;
-            commitIndex = lastApplied + 1;
+                // ideally, below lines should execute atomically
+                stateMachine[request.key] += request.valueDelta;
+                lastApplied = log.size() - 1;
+                commitIndex = lastApplied + 1;
+            }
+            response.succeed = true;
         }
-        response.succeed = true;
     }
     p.set_value(response);
     myLock.unlock();

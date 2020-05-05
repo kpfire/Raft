@@ -62,7 +62,7 @@ class Server {
     //Persistent state on all servers
     int currentTerm;
     int votedFor;
-    vector<pair<int, pair<string, int>>> log;
+    vector<pair<int, string>> log;
 
     //Volatile state on all servers
     //We can reset these variables when a server restarts to mimic their volatile nature

@@ -22,6 +22,21 @@ void split1(const std::string& str, Container& cont)
          std::back_inserter(cont));
 }
 
+template <class Container>
+void split2(const std::string& str, const std::string& delim, Container& cont)
+{
+    size_t prev = 0, pos = 0;
+    do
+    {
+        pos = str.find(delim, prev);
+        if (pos == std::string::npos) pos = str.length();
+        std::string token = str.substr(prev, pos-prev);
+        if (!token.empty()) cont.push_back(token);
+        prev = pos + delim.length();
+    }
+    while (pos < str.length() && prev < str.length());
+}
+
 // this struct allows using pairs as keys in hash tables
 struct pair_hash
 {

@@ -11,6 +11,7 @@ struct ClientRequest {
 };
 
 struct ClientRequestResponse {
+    bool responded;
     bool succeed;
     string message;
 };

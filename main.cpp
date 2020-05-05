@@ -71,11 +71,22 @@ int main(int argc, char * argv[]) {
             }
             // client ask requestedServer to perform stationMachineCommand
             ClientRequestResponse response = raft->clientRequestRPC(requestedServer, stationMachineCommand);
-            if (response.message.size() > 0) {
+            if (!response.responded) {
+                outputLock.lock();
+                cout << "The server did not respond"<< endl;
+                outputLock.unlock();
+            } else if (response.message.size() > 0) {
                 outputLock.lock();
                 cout << "Response: " << response.message << endl;
                 outputLock.unlock();
             }
+        } else if (cmd.rfind("Partition", 0) == 0) {
+            assert(raft != NULL);
+            vector<string> parts;
+            split1(cmd, parts);
+            assert(parts.size() == 2);
+            string partitions = parts[1];
+            //raft->partition(parts[1]);
         } 
         // else {
             // cout << "Invalid command" << endl;

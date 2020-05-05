@@ -28,6 +28,7 @@ ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCo
     assert(serverId < num_servers);
     vector<string> parts;
     split1(stateMachineCommand, parts);
+    //cout << "stateMachineCommand=" << stateMachineCommand << endl;
     ClientRequest request;
     request.key = parts[0];
     if (parts.size() > 1) {
