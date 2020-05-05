@@ -10,6 +10,8 @@ Raft::Raft(int num_servers, std::mutex* outputLock): num_servers(num_servers), o
     for (int i=0; i<num_servers; i++) {
         handles.push_back(std::thread(&Server::eventLoop, servers[i]));
     }
+
+    srand(time(NULL));
 }
 
 void Raft::crashServer(int serverId) {
@@ -41,8 +43,9 @@ void Raft::setDropoutProbability(double p){
 }
 
 bool Raft::dropoutHappens() {
-    int r = rand() % 1000;
-    return r / 1000. < dropoutProbability;
+    double r = (rand() % 100) / 100.;
+    //syncCout(to_string(r) + ", " + to_string(dropoutProbability));
+    return r < dropoutProbability;
 }
 
 ClientRequestResponse Raft::clientRequestRPC(int serverId, string stateMachineCommand) {

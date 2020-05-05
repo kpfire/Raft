@@ -296,7 +296,11 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
 void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
     //raft->syncCout("Server " + to_string(serverId) + " runs replicateLogEntry(" + to_string(replicateIndex) + ", " + to_string(replicateTo) + ");");
     AppendEntriesResponse response = repeatedlyAppendEntries(replicateIndex, replicateTo);
-    if (response.responded && !response.success) {
+    if (!response.responded) {
+        return;
+    }
+
+    if (!response.success) {
         // try previous entry
         int rollbackTo = replicateIndex;
         while (!response.success) {
