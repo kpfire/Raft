@@ -38,6 +38,7 @@ class Raft {
     // List of servers
     vector<Server*> servers;
     int num_servers;
+    // 0 for deterministic timeout (for testing), any other int for random timeout
     int timeoutType;
 
     // Assume after trying for retry_times times, communication between two ONLINE servers will eventualy succeed

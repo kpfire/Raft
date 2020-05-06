@@ -5,6 +5,7 @@ void Server::onServerStart() {
     state = Follower;
     leaderId = -1;
     currentTerm = -1;
+    configIndex = -1;
     interval = 1; // seconds between checking for requests
     // deterministic or randomized election timeout
     if (raft->timeoutType == 0) {
@@ -43,6 +44,7 @@ void Server::eventLoop() {
     while (true) {
         myLock.lock();
         if (online) {
+            vector<int> s_ids;
             //cout << "Server " << this->serverId << " is running..." << endl;
             if (state != Leader){
                 // Check election timeout value
@@ -69,12 +71,18 @@ void Server::eventLoop() {
                     }
                     RequestVote req = {currentTerm, serverId, lastLogIndex, lastTerm};
                     vector<std::future<RequestVoteResponse>> responses;
-                    for (int ids = 0; ids < raft->num_servers; ids++) {
-                        if (ids == serverId) continue;
-                        responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[ids], req, ids));
+                    // Figure out the current config
+                    s_ids = get_config(configIndex);
+                    // DEBUG
+                    //cout << "Current config is ";
+                    //for (int i = 0; i < s_ids.size(); i++) cout << " " << s_ids[i];
+                    // DEBUG
+                    for (int idx = 0; idx < s_ids.size(); idx++) {
+                        if (s_ids[idx] == serverId) continue;
+                        responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[idx], req, s_ids[idx]));
                     }
                     //use the .get() method on each future to get the response
-                    int majority = (int)floor((double)(raft->num_servers)/2.) + 1;
+                    int majority = (int)floor((double)(s_ids.size())/2.) + 1;
                     bool won_election = false;
                     // Collect votes asynchronously
                     while(!won_election) {
@@ -103,23 +111,42 @@ void Server::eventLoop() {
                     if (won_election && state != Follower) {
                         state = Leader;
                         raft->syncCout("Server " + to_string(serverId) + " became the leader");
+                        // Append the new config to everyone's log
                     }
                     last_time = time_now();                 
                 }
             }
             if (state == Leader) {
                 // send out heartbeat
-                for (int ids = 0; ids < raft->num_servers; ids++) {
-                    if (ids == serverId) continue;
-                    repeatedlyAppendEntries(-1, ids);
+                s_ids = get_config(configIndex);
+                for (int idx = 0; idx < s_ids.size(); idx++) {
+                    if (s_ids[idx] == serverId) continue;
+                    cout << "Server " << serverId << " sending heartbeat to " << s_ids[idx] << endl;
+                    repeatedlyAppendEntries(-1, s_ids[idx]);
                 }
-            }            
+            }
         }
         myLock.unlock();
         sleep(interval);
     }
 }
 
+vector<int> Server::get_config(int c_idx) {
+    vector<int> s_ids;
+    if (c_idx == -1) {
+        if (log.size() == 0) { // Brand new Raft
+            for (int i = 0; i < raft->num_servers; i++) s_ids.push_back(i);
+        }
+        else { // We restarted and reset configIndex, but still have a config somewhere
+            configIndex = find_config_index(log);
+            s_ids = read_config(log[configIndex].second);
+        }
+    }
+    else { // We know where our latest config is
+        s_ids = read_config(log[c_idx].second);
+    }
+    return s_ids;
+}
 
 void Server::convertToFollowerIfNecessary(int requestTerm, int requestLeaderId) {
     // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
@@ -195,8 +222,11 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
                 split2(log[lastApplied].second, "+=", parts);
             } else if (log[lastApplied].second.find("-=") != string::npos) {
                 split2(log[lastApplied].second, "-=", parts);
-            } else {
-                //config change logic here
+            } else if (log[lastApplied].second.find("config") != string::npos) {
+                configIndex = lastApplied;
+                cout << "Server " << serverId << " changed configuration " << endl;
+            }
+            else {
                 assert(false);
             }
             
@@ -270,11 +300,12 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
                 log.push_back({currentTerm, operation});
                 int replicateIndex = log.size() - 1;
                 // the min limit to the barrier is 1(current thread) + half of the threads that replicates to other servers
-                // if num_servers = 5, then only TWO other servers needs to reply.
-                barriers[replicateIndex] = new Semaphore(1 + raft->num_servers / 2);
-                for (int i=0; i<raft->num_servers; i++) {
-                    if (i==serverId) continue;
-                    std::async(&Server::replicateLogEntry, raft->servers[serverId], replicateIndex, i);
+                // if total numver of servers = 5, then only TWO other servers needs to reply.
+                vector<int> s_ids = get_config(configIndex);
+                barriers[replicateIndex] = new Semaphore(1 + s_ids.size() / 2);
+                for (int i=0; i<s_ids.size(); i++) {
+                    if (s_ids[i]==serverId) continue;
+                    std::async(&Server::replicateLogEntry, raft->servers[serverId], replicateIndex, s_ids[i]);
                 }
                 barriers[replicateIndex]->notify(serverId);
                 barriers[replicateIndex]->wait(serverId);

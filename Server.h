@@ -60,12 +60,13 @@ class Server {
     Raft* raft;
 
     //Persistent state on all servers
-    int currentTerm;
-    int votedFor;
     vector<pair<int, string>> log;
 
     //Volatile state on all servers
     //We can reset these variables when a server restarts to mimic their volatile nature
+    int configIndex;
+    int currentTerm;
+    int votedFor;
     int commitIndex;
     int lastApplied;
 
@@ -107,6 +108,9 @@ class Server {
     AppendEntriesResponse appendEntriesRPC(int, int);
 
     AppendEntriesResponse repeatedlyAppendEntries(int, int);
+
+    // Utility for config
+    vector<int> get_config(int);
 };
 
 #endif

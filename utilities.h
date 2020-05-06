@@ -60,4 +60,26 @@ static double time_passed(double t) {
 	return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count() / 1000. - t;
 }
 
+using namespace std;
+
+// Read config into vector of ints
+static vector<int> read_config(string s) {
+    string to_delete = "config=";
+    s.erase(0, to_delete.length());
+    vector<int> ids;
+    stringstream ss(s);
+    while(ss.good()) {
+        string substr;
+        getline(ss, substr, ',');
+        ids.push_back(stoi(substr));
+    }
+    return ids;
+}
+
+// Find last config entry
+static int find_config_index(vector<pair<int, string>> l) {
+    auto result = find_if(l.rbegin(), l.rend(), [](pair<int, string> p) {return p.second.find("config") != string::npos;});
+    return distance(result, l.rend()) - 1;
+}
+
 #endif
