@@ -1,6 +1,6 @@
 #include "Raft.h"
 
-Raft::Raft(int num_servers, std::mutex* outputLock): num_servers(num_servers), outputLock(outputLock) {
+Raft::Raft(int num_servers, int t_type, std::mutex* outputLock): num_servers(num_servers), outputLock(outputLock), timeoutType(t_type) {
     // start the specified amount of servers(threads)
     for (int i=0; i<num_servers; i++) {
         Server* svr = new Server(i, this);

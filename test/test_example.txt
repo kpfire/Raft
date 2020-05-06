@@ -1,4 +1,4 @@
-StartRaft 3
+StartRaft 3 0
 Dropout 0.5
 Sleep 5
 CrashServer 0

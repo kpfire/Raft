@@ -35,15 +35,15 @@ class Raft {
     double dropoutProbability = .0;
     
     public:
-    // List of ervers
+    // List of servers
     vector<Server*> servers;
-
     int num_servers;
+    int timeoutType;
 
     // Assume after trying for retry_times times, communication between two ONLINE servers will eventualy succeed
     int retry_times = 1;
     
-    Raft(int totalServers, std::mutex* outputLock);
+    Raft(int totalServers, int t_type, std::mutex* outputLock);
 
     ~Raft() { }
 

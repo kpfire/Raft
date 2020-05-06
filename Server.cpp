@@ -6,10 +6,13 @@ void Server::onServerStart() {
     leaderId = -1;
     currentTerm = -1;
     interval = 1; // seconds between checking for requests
-    // randomized election timeout
-    //timeout = 5 + rand() % 5;
-    // debug
-    timeout = 2 + (3 * serverId + 1);
+    // deterministic or randomized election timeout
+    if (raft->timeoutType == 0) {
+        timeout = 2 + (3 * serverId + 1);
+    }
+    else {
+        timeout = 5 + rand() % 8;
+    }
     last_time = time_now();
     votedFor = -1; // instead of NULL
     // reset volatile variables because they are supposed to be lost

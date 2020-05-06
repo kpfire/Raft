@@ -1,4 +1,4 @@
-StartRaft 5
+StartRaft 5 0
 Sleep 5
 Request 0 X
 Partition {0,1},{2,3,4}
