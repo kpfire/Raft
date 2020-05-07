@@ -451,9 +451,9 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
             response = repeatedlyAppendEntries(rollbackTo, replicateTo);
         } 
         // now replicate again starting from rollbackTo+1
-        rollbackTo++;
         while (rollbackTo < replicateIndex) {
-            response = repeatedlyAppendEntries(replicateIndex, replicateTo);
+            rollbackTo++;
+            response = repeatedlyAppendEntries(rollbackTo, replicateTo);
             //assert(response.success);
             rollbackTo++;
         }
