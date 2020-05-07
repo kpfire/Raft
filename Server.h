@@ -40,8 +40,6 @@ class Server {
     //Own our variables
     // lock
     std::mutex myLock;
-    //Use a boolean variable to mimic server crashes. If it is false, then the server should be not responding.
-    bool online;
     // Interval to sleep between checking for requests, also factors into checking the election timeout at every execution
     int interval;
     // Election timeout limit in seconds
@@ -84,7 +82,9 @@ class Server {
     public:
     // this server's identifier
     int serverId;
-
+    //Use a boolean variable to mimic server crashes. If it is false, then the server should be not responding.
+    bool online;
+    
     Server(int serverId, Raft* raft):serverId(serverId), raft(raft) {
         onServerStart();
     };
@@ -109,7 +109,8 @@ class Server {
 
     AppendEntriesResponse repeatedlyAppendEntries(int, int);
 
-    // Utility for config
+    // Config functions
+    bool change_config(string config_string);
     void get_config(int c_idx, vector<vector<int>> &config_groups);
 };
 

@@ -106,7 +106,13 @@ int main(int argc, char * argv[]) {
             assert(parts.size() == 2);
             double dropoutProbability = stod(parts[1]);
             raft->setDropoutProbability(dropoutProbability);
-        } 
+        } else if (cmd.rfind("ConfigChange", 0) == 0) {
+            assert(raft != NULL);
+            vector<string> parts;
+            split1(cmd, parts);
+            assert(parts.size() == 3);
+            raft->callConfigChange(stoi(parts[1]), parts[2]);
+        }
         // else {
             // cout << "Invalid command" << endl;
         // }

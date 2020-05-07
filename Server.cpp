@@ -145,10 +145,12 @@ void Server::eventLoop() {
                     myLock.unlock();
                     clientRequest(req, std::move(p));
                     myLock.lock();
-                    // Shut down all old servers not in the new config
+                    // Shut down all old servers (including self) not in the new config
                     for (int k = 0; k < old_config.size(); k++) {
                         if (std::find(new_config.begin(), new_config.end(), old_config[k]) == new_config.end()) {
+                            myLock.unlock();
                             raft->servers[old_config[k]]->crash();
+                            myLock.lock();
                         }
                     }
                 }
@@ -169,6 +171,33 @@ void Server::eventLoop() {
     }
 }
 
+bool Server::change_config(string change_to) {
+    myLock.lock();
+    vector<vector<int>> config_groups;
+    get_config(configIndex, config_groups);
+    bool retval = false;
+    if (state != Leader) {
+        raft->syncCout("Please contact server " + to_string(leaderId));
+    }
+    else if (config_groups.size() == 2) {
+        raft->syncCout("Server " + to_string(serverId) + " is currently in the middle of a configuration change!");
+    }
+    else {
+        string new_config_string = config_str(config_groups[0]) + "-" + change_to;
+        raft->syncCout("Server " + to_string(serverId) + " initiating config change to: " + new_config_string);
+        ClientRequest req;
+        req.key = new_config_string;
+        req.valueDelta = -1;
+        promise<ClientRequestResponse> p;
+        myLock.unlock();
+        clientRequest(req, std::move(p));
+        myLock.lock();
+        retval = true;
+    }
+    myLock.unlock();
+    return retval;
+}
+
 void Server::get_config(int c_idx, vector<vector<int>> &config_groups) {
     vector<int> v1;
     vector<int> v2;
@@ -181,7 +210,7 @@ void Server::get_config(int c_idx, vector<vector<int>> &config_groups) {
             string c = log[configIndex].second;
             if (is_joint(c)) {
                 read_config(c.substr(0, c.find("-")), v1);
-                read_config(c.substr(c.find("-")), v2);
+                read_config(c.substr(c.find("-") + 1), v2);
             }
             else {
                 read_config(c, v1);
@@ -192,7 +221,7 @@ void Server::get_config(int c_idx, vector<vector<int>> &config_groups) {
         string c = log[configIndex].second;
         if (is_joint(c)) {
             read_config(c.substr(0, c.find("-")), v1);
-            read_config(c.substr(c.find("-")), v2);
+            read_config(c.substr(c.find("-") + 1), v2);
         }
         else {
             read_config(c, v1);

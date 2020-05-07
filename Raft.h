@@ -60,8 +60,10 @@ class Raft {
 
     bool dropoutHappens();
 
+    void callConfigChange(int serverId, string change_to);
+
     // RPC functions run on the caller
-    ClientRequestResponse clientRequestRPC(int requestedServer, string stationMachineCommand) ;
+    ClientRequestResponse clientRequestRPC(int requestedServer, string stationMachineCommand);
 
     // Synchronous cout
     void syncCout(string);

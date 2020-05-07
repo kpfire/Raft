@@ -14,6 +14,35 @@ Raft::Raft(int num_servers, int t_type, std::mutex* outputLock): num_servers(num
     srand(time(NULL));
 }
 
+void Raft::callConfigChange(int serverId, string change_to) {
+    stringstream ss(change_to);
+    vector<int> awoken_servers;
+    while(ss.good()) {
+        string substr;
+        getline(ss, substr, ',');
+        int new_server_id = stoi(substr);
+        if (servers.find(new_server_id) == servers.end()) { // Start new servers
+            Server* svr = new Server(new_server_id, this);
+            servers[new_server_id] = svr;
+            handles.push_back(std::thread(&Server::eventLoop, servers[new_server_id]));
+            ++num_servers;
+            awoken_servers.push_back(new_server_id);
+        }
+        else { // Wake up crashed servers
+            if (!servers[new_server_id]->online) {
+                servers[new_server_id]->restart();
+                awoken_servers.push_back(new_server_id);
+            }
+        }
+    }
+    bool succeed = servers[serverId]->change_config(change_to);
+    if (!succeed) {
+        for (int k = 0; k < awoken_servers.size(); k++) {
+            servers[awoken_servers[k]]->crash();
+        }
+    }
+}
+
 void Raft::crashServer(int serverId) {
     assert(serverId < num_servers);
 
