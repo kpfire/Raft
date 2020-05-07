@@ -97,4 +97,13 @@ static string config_str(vector<int> v) {
     return config_str;
 }
 
+static string log_to_string(vector<pair<int, string>> log) {
+    string ret = "[";
+    for (int i = 0; i < log.size(); i++) {
+        ret += "(" + to_string(log[i].first) + "," + log[i].second + "),";
+    }
+    ret += "]";
+    return ret;
+}
+
 #endif

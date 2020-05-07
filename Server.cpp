@@ -274,7 +274,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     }
     else if (request.term < currentTerm) {
         // Reply false if term < currentTerm (§5.1)
-        raft->syncCout("Append failed in server " + to_string(serverId) + " because of less term");
+        raft->syncCout("Append failed in server " + to_string(serverId) + " because of smaller term");
         response.success = false;
         response.term = currentTerm;
     } else if (request.prevLogIndex >=0 && (request.prevLogIndex >= log.size() || log[request.prevLogIndex].first != request.prevLogTerm)) {
@@ -284,6 +284,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         raft->syncCout("Log size " + to_string(log.size()));
         if (log.size() > 0) raft->syncCout("log[request.prevLogIndex].first=" + to_string(log[request.prevLogIndex].first));
         raft->syncCout("preLogIndex " + to_string(request.prevLogIndex) + " prevLogTerm " + to_string(request.prevLogTerm));
+        raft->syncCout(log_to_string(log));
         // if (log.size() > request.prevLogIndex) raft->syncCout("previous log item " + to_string(log[request.prevLogIndex].first) + "," + log[request.prevLogIndex].second);
         response.term = currentTerm;
     } else {
