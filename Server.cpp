@@ -253,6 +253,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     myLock.lock();
     AppendEntriesResponse response;
     if (!online) {
+        //raft->syncCout("Append failed, server " + to_string(serverId) + " not online");
         response.responded = false;
         p.set_value(response);
         myLock.unlock();
@@ -273,11 +274,13 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     }
     else if (request.term < currentTerm) {
         // Reply false if term < currentTerm (§5.1)
+        //raft->syncCout("Append failed in server " + to_string(serverId) + " because of less term");
         response.success = false;
         response.term = currentTerm;
     } else if (request.prevLogIndex >=0 && (request.prevLogIndex >= log.size() || log[request.prevLogIndex].first != request.prevLogTerm)) {
         //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
         response.success = false;
+        //raft->syncCout("Append failed in server " + to_string(serverId) + " because of non-matching prevLogIndex");
         response.term = currentTerm;
     } else {
         // If an existing entry conflicts with a new one (same index but different terms), 
@@ -296,9 +299,10 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         }
         response.success = true;
         response.term = currentTerm;
-
+        int new_config_idx = configIndex;
         //If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine (§5.3)
         while (commitIndex > lastApplied) {
+            bool config_changed = false;
             lastApplied++;
             vector<string> parts;
             if (log[lastApplied].second.find("+=") != string::npos) {
@@ -306,16 +310,20 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
             } else if (log[lastApplied].second.find("-=") != string::npos) {
                 split2(log[lastApplied].second, "-=", parts);
             } else if (log[lastApplied].second.find("config") != string::npos) {
-                // Config entries have no effect on the state machine
-                configIndex = lastApplied;
-                raft->syncCout("Server " + to_string(serverId) + " changed configuration");
-                break;
+                new_config_idx = lastApplied;
+                config_changed = true;
             }
             else {
                 assert(false);
             }
-            
-            stateMachine[parts[0]] += stoi(parts[1]);
+            // Config entries have no effect on the state machine
+            if (!config_changed) {
+                stateMachine[parts[0]] += stoi(parts[1]);
+            }
+        }
+        if (new_config_idx != configIndex) { 
+            configIndex = new_config_idx;
+            raft->syncCout("Server " + to_string(serverId) + " changed configuration");
         }
         // infered logic (not in paper)
         leaderId = request.leaderId;
@@ -463,13 +471,14 @@ AppendEntriesResponse Server::repeatedlyAppendEntries(int replicateIndex, int re
 // RPC functions run on the caller
 AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicateTo) {
     if (raft->dropoutHappens()) {
-        //raft->syncCout("Dropout appendEntries from " + to_string(serverId) + " to " + to_string(replicateTo));
+        raft->syncCout("Dropout appendEntries from " + to_string(serverId) + " to " + to_string(replicateTo));
         AppendEntriesResponse response;
         response.responded = false;
         return response;
     }
     
     if (!raft->belongToSamePartition(serverId, replicateTo)) {
+        raft->syncCout("Not same partition " + to_string(serverId) + " to " + to_string(replicateTo));
         AppendEntriesResponse response;
         response.responded = false;
         return response;
@@ -496,7 +505,7 @@ AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicate
     t.join();
 
     if (raft->dropoutHappens()) {
-        //raft->syncCout("Dropout appendEntries response from " + to_string(replicateTo) + " to " + to_string(serverId));
+        raft->syncCout("Dropout appendEntries response from " + to_string(replicateTo) + " to " + to_string(serverId));
         AppendEntriesResponse response;
         response.responded = false;
         return response;
