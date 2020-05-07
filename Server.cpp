@@ -30,7 +30,7 @@ void Server::onServerStart() {
 void Server::crash() {
     myLock.lock();
     online = false;
-    raft->syncCout("Server " + to_string(serverId) + " crashed");
+    raft->syncCout("Server " + to_string(serverId) + " is offline");
     myLock.unlock();
 }
 
@@ -123,27 +123,43 @@ void Server::eventLoop() {
                 // If brand new raft, append the config to everyone's log
                 if (log.size() == 0) {
                     get_config(configIndex, config_groups);
-                    string config_str = "config=";
-                    vector<int> vv = config_groups[0];
-                    for (int i = 0; i < vv.size(); i++) {
-                        if (i != vv.size() - 1) config_str += to_string(vv[i]) + ",";
-                        else config_str += to_string(vv[i]);
-                    }
+                    string c_s = config_str(config_groups[0]); 
                     ClientRequest req;
-                    req.key = config_str;
+                    req.key = c_s;
                     req.valueDelta = -1;
                     promise<ClientRequestResponse> p;
                     myLock.unlock();
                     clientRequest(req, std::move(p));
                     myLock.lock();
                 }
-                // send out heartbeat
                 get_config(configIndex, config_groups);
-                for (int i = 0; i < config_groups.size(); i++) {
-                    vector<int> v_temp = config_groups[i];
-                    for (int idx = 0; idx < v_temp.size(); idx++) {
-                        if (v_temp[idx] == serverId) continue;
-                        repeatedlyAppendEntries(-1, v_temp[idx]);
+                // If resuming a crashed config change, continue the process
+                if (config_groups.size() == 2) {
+                    vector<int> old_config = config_groups[0];
+                    vector<int> new_config = config_groups[1];
+                    string c_s = config_str(new_config);
+                    ClientRequest req;
+                    req.key = c_s;
+                    req.valueDelta = -1;
+                    promise<ClientRequestResponse> p;
+                    myLock.unlock();
+                    clientRequest(req, std::move(p));
+                    myLock.lock();
+                    // Shut down all old servers not in the new config
+                    for (int k = 0; k < old_config.size(); k++) {
+                        if (std::find(new_config.begin(), new_config.end(), old_config[k]) == new_config.end()) {
+                            raft->servers[old_config[k]]->crash();
+                        }
+                    }
+                }
+                // Else send out heartbeat
+                else {
+                    for (int i = 0; i < config_groups.size(); i++) {
+                        vector<int> v_temp = config_groups[i];
+                        for (int idx = 0; idx < v_temp.size(); idx++) {
+                            if (v_temp[idx] == serverId) continue;
+                            repeatedlyAppendEntries(-1, v_temp[idx]);
+                        }
                     }
                 }
             }

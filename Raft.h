@@ -36,7 +36,7 @@ class Raft {
     
     public:
     // List of servers
-    vector<Server*> servers;
+    unordered_map<int, Server*> servers;
     int num_servers;
     // 0 for deterministic timeout (for testing), any other int for random timeout
     int timeoutType;

@@ -4,7 +4,7 @@ Raft::Raft(int num_servers, int t_type, std::mutex* outputLock): num_servers(num
     // start the specified amount of servers(threads)
     for (int i=0; i<num_servers; i++) {
         Server* svr = new Server(i, this);
-        servers.push_back(svr);
+        servers[i] = svr;
     }
 
     for (int i=0; i<num_servers; i++) {
