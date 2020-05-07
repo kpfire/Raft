@@ -111,7 +111,10 @@ void Server::eventLoop() {
                     if (won_election && state != Follower) {
                         state = Leader;
                         raft->syncCout("Server " + to_string(serverId) + " became the leader");
-                        // Append the new config to everyone's log
+                        // If brand new raft, append the config to everyone's log
+                        if (log.size() == 0) {
+                            // TODO
+                        }
                     }
                     last_time = time_now();                 
                 }
@@ -137,7 +140,7 @@ vector<int> Server::get_config(int c_idx) {
         if (log.size() == 0) { // Brand new Raft
             for (int i = 0; i < raft->num_servers; i++) s_ids.push_back(i);
         }
-        else { // We restarted and reset configIndex, but still have a config somewhere
+        else { // We restarted and reset configIndex, but still have a config somewhere in the log
             configIndex = find_config_index(log);
             s_ids = read_config(log[configIndex].second);
         }
