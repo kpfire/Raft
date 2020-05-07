@@ -63,7 +63,7 @@ static double time_passed(double t) {
 using namespace std;
 
 // Read config into vector of ints
-void read_config(string s, vector<int> &v) {
+static void read_config(string s, vector<int> &v) {
     string to_delete = "config=";
     if (s.find(to_delete) != string::npos) {
         s.erase(0, to_delete.length());

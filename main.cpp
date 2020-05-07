@@ -42,8 +42,9 @@ int main(int argc, char * argv[]) {
             assert(raft == NULL);
             vector<string> parts;
             split1(cmd, parts);
-            assert(parts.size() == 3);
-            raft = new Raft(stoi(parts[1]), stoi(parts[2]), &outputLock);
+            int timeout_type = 0;
+            if (parts.size() == 3) timeout_type = stoi(parts[2]);
+            raft = new Raft(stoi(parts[1]), timeout_type, &outputLock);
         } else if (cmd.rfind("CrashServer", 0) == 0) {
             assert(raft != NULL);
             vector<string> parts;

@@ -115,37 +115,34 @@ void Server::eventLoop() {
                     if (overall_win && state != Follower) {
                         state = Leader;
                         raft->syncCout("Server " + to_string(serverId) + " became the leader");
-                        // If brand new raft, append the config to everyone's log
-                        if (log.size() == 0) {
-                            get_config(configIndex, config_groups);
-                            string config_str = "";
-                            vector<int> vv = config_groups[0];
-                            for (int i = 0; i < vv.size(); i++) {
-                                if (i != vv.size() - 1) config_str += to_string(vv[i]) + ",";
-                                else config_str += to_string(vv[i]);
-                            }
-                            ClientRequest req;
-                            req.key = config_str;
-                            req.valueDelta = -1;
-                            promise<ClientRequestResponse> p;
-                            auto f = p.get_future();
-                            myLock.unlock();
-                            std::thread t(&Server::clientRequest, serverId, req, std::move(p));
-                            t.join();
-                            myLock.lock();
-                        }
                     }
                     last_time = time_now();                 
                 }
             }
             if (state == Leader) {
+                // If brand new raft, append the config to everyone's log
+                if (log.size() == 0) {
+                    get_config(configIndex, config_groups);
+                    string config_str = "config=";
+                    vector<int> vv = config_groups[0];
+                    for (int i = 0; i < vv.size(); i++) {
+                        if (i != vv.size() - 1) config_str += to_string(vv[i]) + ",";
+                        else config_str += to_string(vv[i]);
+                    }
+                    ClientRequest req;
+                    req.key = config_str;
+                    req.valueDelta = -1;
+                    promise<ClientRequestResponse> p;
+                    myLock.unlock();
+                    clientRequest(req, std::move(p));
+                    myLock.lock();
+                }
                 // send out heartbeat
                 get_config(configIndex, config_groups);
                 for (int i = 0; i < config_groups.size(); i++) {
                     vector<int> v_temp = config_groups[i];
                     for (int idx = 0; idx < v_temp.size(); idx++) {
                         if (v_temp[idx] == serverId) continue;
-                        //cout << "Server " << serverId << " sending heartbeat to " << v_temp[idx] << endl;
                         repeatedlyAppendEntries(-1, v_temp[idx]);
                     }
                 }
@@ -266,7 +263,8 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
             } else if (log[lastApplied].second.find("config") != string::npos) {
                 // Config entries have no effect on the state machine
                 configIndex = lastApplied;
-                cout << "Server " << serverId << " changed configuration " << endl;
+                raft->syncCout("Server " + to_string(serverId) + " changed configuration");
+                break;
             }
             else {
                 assert(false);
@@ -339,7 +337,7 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
                 // delta != 0. We consider it as an update
                 string operation;
                 if (request.key.find("config") != string::npos) {
-                    configIndex = log.size() + 1;
+                    configIndex = log.size();
                     operation = request.key;
                 }
                 else {
@@ -350,16 +348,19 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
                 int replicateIndex = log.size() - 1;
                 // the min limit to the barrier is 1(current thread) + half of the threads that replicates to other servers
                 // if total numver of servers = 5, then only TWO other servers needs to reply.
-                vector<int> s_ids = get_config(configIndex);
-                barriers[replicateIndex] = new Semaphore(1 + s_ids.size() / 2);
-                for (int i=0; i<s_ids.size(); i++) {
-                    if (s_ids[i]==serverId) continue;
-                    std::async(&Server::replicateLogEntry, raft->servers[serverId], replicateIndex, s_ids[i]);
+                vector<vector<int>> config_groups;
+                get_config(configIndex, config_groups);
+                for (int c_idx = 0; c_idx < config_groups.size(); c_idx++) {
+                    vector<int> s_ids = config_groups[c_idx];
+                    barriers[replicateIndex] = new Semaphore(1 + s_ids.size() / 2);
+                    for (int i=0; i<s_ids.size(); i++) {
+                        if (s_ids[i]==serverId) continue;
+                        std::async(&Server::replicateLogEntry, raft->servers[serverId], replicateIndex, s_ids[i]);
+                    }
+                    barriers[replicateIndex]->notify(serverId);
+                    barriers[replicateIndex]->wait(serverId);
+                    raft->syncCout("Log entry " + to_string(replicateIndex) + " has been replicated");
                 }
-                barriers[replicateIndex]->notify(serverId);
-                barriers[replicateIndex]->wait(serverId);
-                raft->syncCout("Log entry " + to_string(replicateIndex) + " has been replicated");
-
                 // ideally, below lines should execute atomically
                 stateMachine[request.key] += request.valueDelta;
                 lastApplied = log.size() - 1;
