@@ -13,3 +13,5 @@ test: clean build
 	echo "testing given examples"
 	./raft.o < test/test_example.txt
 
+test_config: clean build
+	./raft.o < test/test_config_simple.txt

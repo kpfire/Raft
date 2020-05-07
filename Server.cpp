@@ -280,10 +280,10 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     } else if (request.prevLogIndex >=0 && (request.prevLogIndex >= log.size() || log[request.prevLogIndex].first != request.prevLogTerm)) {
         //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
         response.success = false;
-        raft->syncCout("Append failed in server " + to_string(serverId) + " because of non-matching prevLogIndex");
+        //raft->syncCout("Append failed in server " + to_string(serverId) + " because of non-matching prevLogIndex");
+        raft->syncCout("Log size " + to_string(log.size()));
         raft->syncCout("preLogIndex " + to_string(request.prevLogIndex) + " prevLogTerm " + to_string(request.prevLogTerm));
-        // if (log.size() > 0)
-        //     raft->syncCout("previous log item " + to_string(log[request.prevLogIndex].first) + "," + log[request.prevLogIndex].second);
+        // if (log.size() > request.prevLogIndex) raft->syncCout("previous log item " + to_string(log[request.prevLogIndex].first) + "," + log[request.prevLogIndex].second);
         response.term = currentTerm;
     } else {
         // If an existing entry conflicts with a new one (same index but different terms), 
