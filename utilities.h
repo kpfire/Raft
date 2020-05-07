@@ -63,23 +63,28 @@ static double time_passed(double t) {
 using namespace std;
 
 // Read config into vector of ints
-static vector<int> read_config(string s) {
+void read_config(string s, vector<int> &v) {
     string to_delete = "config=";
-    s.erase(0, to_delete.length());
-    vector<int> ids;
+    if (s.find(to_delete) != string::npos) {
+        s.erase(0, to_delete.length());
+    }
     stringstream ss(s);
     while(ss.good()) {
         string substr;
         getline(ss, substr, ',');
-        ids.push_back(stoi(substr));
+        v.push_back(stoi(substr));
     }
-    return ids;
 }
 
 // Find last config entry
 static int find_config_index(vector<pair<int, string>> l) {
     auto result = find_if(l.rbegin(), l.rend(), [](pair<int, string> p) {return p.second.find("config") != string::npos;});
     return distance(result, l.rend()) - 1;
+}
+
+// detect if it's a joint configuration
+static bool is_joint(string c) {
+    return c.find("-") != string::npos;
 }
 
 #endif

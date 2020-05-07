@@ -44,7 +44,7 @@ void Server::eventLoop() {
     while (true) {
         myLock.lock();
         if (online) {
-            vector<int> s_ids;
+            vector<vector<int>> config_groups;
             //cout << "Server " << this->serverId << " is running..." << endl;
             if (state != Leader){
                 // Check election timeout value
@@ -56,8 +56,6 @@ void Server::eventLoop() {
                     auto election_start = time_now();
                     state = Candidate;
                     currentTerm += 1;
-                    int collected_votes = 1; // votes for self
-                    // Request votes from everyone but self
                     int lastLogIndex;
                     int lastTerm;
                     if (log.size() == 0) {
@@ -72,48 +70,69 @@ void Server::eventLoop() {
                     RequestVote req = {currentTerm, serverId, lastLogIndex, lastTerm};
                     vector<std::future<RequestVoteResponse>> responses;
                     // Figure out the current config
-                    s_ids = get_config(configIndex);
-                    // DEBUG
-                    //cout << "Current config is ";
-                    //for (int i = 0; i < s_ids.size(); i++) cout << " " << s_ids[i];
-                    // DEBUG
-                    for (int idx = 0; idx < s_ids.size(); idx++) {
-                        if (s_ids[idx] == serverId) continue;
-                        responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[idx], req, s_ids[idx]));
-                    }
-                    //use the .get() method on each future to get the response
-                    int majority = (int)floor((double)(s_ids.size())/2.) + 1;
-                    bool won_election = false;
-                    // Collect votes asynchronously
-                    while(!won_election) {
-                        if (time_passed(election_start) > timeout) {
-                            raft->syncCout("Election on server " + to_string(serverId) + " timed out!");
-                            break;
+                    get_config(configIndex, config_groups);
+                    bool overall_win = true;
+                    // Get majorities from all configuration groups
+                    for (int c_idx = 0; c_idx < config_groups.size(); c_idx++) {
+                        vector<int> s_ids = config_groups[c_idx];
+                        int collected_votes = 1; // votes for self
+                        for (int idx = 0; idx < s_ids.size(); idx++) {
+                            if (s_ids[idx] == serverId) continue;
+                            responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[idx], req, s_ids[idx]));
                         }
-                        auto it = responses.begin();
-                        while(it != responses.end() && !won_election) {
-                            std::future<RequestVoteResponse>& f = *it;
-                            if (f.wait_for(0ms) == std::future_status::ready) { // This thread is done running
-                                RequestVoteResponse r = f.get();
-                                if (r.responded && r.voteGranted) {
-                                    raft->syncCout("Server " + to_string(serverId) + " received a vote!");
-                                    collected_votes++;
-                                    if (collected_votes >= majority) {
-                                        won_election = true;
-                                    }
-                                }
-                                it = responses.erase(it);
+                        //use the .get() method on each future to get the response
+                        int majority = (int)floor((double)(s_ids.size())/2.) + 1;
+                        bool won_election = false;
+                        // Collect votes asynchronously
+                        while(!won_election) {
+                            if (time_passed(election_start) > timeout) {
+                                raft->syncCout("Election on server " + to_string(serverId) + " timed out!");
+                                break;
                             }
-                            else ++it;
+                            auto it = responses.begin();
+                            while(it != responses.end() && !won_election) {
+                                std::future<RequestVoteResponse>& f = *it;
+                                if (f.wait_for(0ms) == std::future_status::ready) { // This thread is done running
+                                    RequestVoteResponse r = f.get();
+                                    if (r.responded && r.voteGranted) {
+                                        raft->syncCout("Server " + to_string(serverId) + " received a vote!");
+                                        collected_votes++;
+                                        if (collected_votes >= majority) {
+                                            won_election = true;
+                                        }
+                                    }
+                                    it = responses.erase(it);
+                                }
+                                else ++it;
+                            }
+                        }
+                        if (!won_election) {
+                            overall_win = false;
+                            break;
                         }
                     }
                     // Also recheck if state was reset by a new leader before winning election
-                    if (won_election && state != Follower) {
+                    if (overall_win && state != Follower) {
                         state = Leader;
                         raft->syncCout("Server " + to_string(serverId) + " became the leader");
                         // If brand new raft, append the config to everyone's log
                         if (log.size() == 0) {
-                            // TODO
+                            get_config(configIndex, config_groups);
+                            string config_str = "";
+                            vector<int> vv = config_groups[0];
+                            for (int i = 0; i < vv.size(); i++) {
+                                if (i != vv.size() - 1) config_str += to_string(vv[i]) + ",";
+                                else config_str += to_string(vv[i]);
+                            }
+                            ClientRequest req;
+                            req.key = config_str;
+                            req.valueDelta = -1;
+                            promise<ClientRequestResponse> p;
+                            auto f = p.get_future();
+                            myLock.unlock();
+                            std::thread t(&Server::clientRequest, serverId, req, std::move(p));
+                            t.join();
+                            myLock.lock();
                         }
                     }
                     last_time = time_now();                 
@@ -121,11 +140,14 @@ void Server::eventLoop() {
             }
             if (state == Leader) {
                 // send out heartbeat
-                s_ids = get_config(configIndex);
-                for (int idx = 0; idx < s_ids.size(); idx++) {
-                    if (s_ids[idx] == serverId) continue;
-                    cout << "Server " << serverId << " sending heartbeat to " << s_ids[idx] << endl;
-                    repeatedlyAppendEntries(-1, s_ids[idx]);
+                get_config(configIndex, config_groups);
+                for (int i = 0; i < config_groups.size(); i++) {
+                    vector<int> v_temp = config_groups[i];
+                    for (int idx = 0; idx < v_temp.size(); idx++) {
+                        if (v_temp[idx] == serverId) continue;
+                        //cout << "Server " << serverId << " sending heartbeat to " << v_temp[idx] << endl;
+                        repeatedlyAppendEntries(-1, v_temp[idx]);
+                    }
                 }
             }
         }
@@ -134,21 +156,37 @@ void Server::eventLoop() {
     }
 }
 
-vector<int> Server::get_config(int c_idx) {
-    vector<int> s_ids;
+void Server::get_config(int c_idx, vector<vector<int>> &config_groups) {
+    vector<int> v1;
+    vector<int> v2;
     if (c_idx == -1) {
         if (log.size() == 0) { // Brand new Raft
-            for (int i = 0; i < raft->num_servers; i++) s_ids.push_back(i);
+            for (int i = 0; i < raft->num_servers; i++) v1.push_back(i);
         }
         else { // We restarted and reset configIndex, but still have a config somewhere in the log
             configIndex = find_config_index(log);
-            s_ids = read_config(log[configIndex].second);
+            string c = log[configIndex].second;
+            if (is_joint(c)) {
+                read_config(c.substr(0, c.find("-")), v1);
+                read_config(c.substr(c.find("-")), v2);
+            }
+            else {
+                read_config(c, v1);
+            }
         }
     }
-    else { // We know where our latest config is
-        s_ids = read_config(log[c_idx].second);
+    else { // We already know where our latest config is
+        string c = log[configIndex].second;
+        if (is_joint(c)) {
+            read_config(c.substr(0, c.find("-")), v1);
+            read_config(c.substr(c.find("-")), v2);
+        }
+        else {
+            read_config(c, v1);
+        }
     }
-    return s_ids;
+    config_groups.push_back(v1);
+    if (v2.size() > 0) config_groups.push_back(v2);
 }
 
 void Server::convertToFollowerIfNecessary(int requestTerm, int requestLeaderId) {
@@ -226,6 +264,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
             } else if (log[lastApplied].second.find("-=") != string::npos) {
                 split2(log[lastApplied].second, "-=", parts);
             } else if (log[lastApplied].second.find("config") != string::npos) {
+                // Config entries have no effect on the state machine
                 configIndex = lastApplied;
                 cout << "Server " << serverId << " changed configuration " << endl;
             }
@@ -298,8 +337,15 @@ void Server::clientRequest(ClientRequest request, std::promise<ClientRequestResp
                 response.message = request.key + "=" + to_string(stateMachine[request.key]);
             } else {
                 // delta != 0. We consider it as an update
-                // If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
-                string operation = request.key + "+=" + to_string(request.valueDelta);
+                string operation;
+                if (request.key.find("config") != string::npos) {
+                    configIndex = log.size() + 1;
+                    operation = request.key;
+                }
+                else {
+                    // If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
+                    operation = request.key + "+=" + to_string(request.valueDelta);
+                }
                 log.push_back({currentTerm, operation});
                 int replicateIndex = log.size() - 1;
                 // the min limit to the barrier is 1(current thread) + half of the threads that replicates to other servers

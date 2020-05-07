@@ -110,7 +110,7 @@ class Server {
     AppendEntriesResponse repeatedlyAppendEntries(int, int);
 
     // Utility for config
-    vector<int> get_config(int);
+    void Server::get_config(int c_idx, vector<vector<int>> &config_groups);
 };
 
 #endif
