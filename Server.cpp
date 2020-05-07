@@ -455,7 +455,6 @@ void Server::replicateLogEntry(int replicateIndex, int replicateTo) {
             rollbackTo++;
             response = repeatedlyAppendEntries(rollbackTo, replicateTo);
             //assert(response.success);
-            rollbackTo++;
         }
         // done
         raft->syncCout("Server " + to_string(replicateTo) + " synchronized its log from server " + to_string(serverId) + " (index of last log entry = " + to_string(replicateIndex) + ")");
