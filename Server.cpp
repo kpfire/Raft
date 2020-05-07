@@ -274,16 +274,16 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     }
     else if (request.term < currentTerm) {
         // Reply false if term < currentTerm (§5.1)
-        raft->syncCout("Append failed in server " + to_string(serverId) + " because of smaller term");
+        // raft->syncCout("Append failed in server " + to_string(serverId) + " because of smaller term");
         response.success = false;
         response.term = currentTerm;
     } else if (request.prevLogIndex >=0 && (request.prevLogIndex >= log.size() || log[request.prevLogIndex].first != request.prevLogTerm)) {
         //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
         response.success = false;
         //raft->syncCout("Append failed in server " + to_string(serverId) + " because of non-matching prevLogIndex");
-        if (log.size() > 0) raft->syncCout("log[request.prevLogIndex].first=" + to_string(log[request.prevLogIndex].first));
-        raft->syncCout("prevLogIndex:" + to_string(request.prevLogIndex) + " prevLogTerm:" + to_string(request.prevLogTerm));
-        raft->syncCout(log_to_string(log));
+        // if (log.size() > 0) raft->syncCout("log[request.prevLogIndex].first=" + to_string(log[request.prevLogIndex].first));
+        // raft->syncCout("prevLogIndex:" + to_string(request.prevLogIndex) + " prevLogTerm:" + to_string(request.prevLogTerm));
+        // raft->syncCout(log_to_string(log));
         // if (log.size() > request.prevLogIndex) raft->syncCout("previous log item " + to_string(log[request.prevLogIndex].first) + "," + log[request.prevLogIndex].second);
         response.term = currentTerm;
     } else {
@@ -520,7 +520,7 @@ AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicate
 // RPC functions run on the caller
 RequestVoteResponse Server::requestVoteRPC(RequestVote request, int sendTo) {
     if (raft->dropoutHappens()) {
-        //raft->syncCout("Dropout requestVote from " + to_string(serverId) + " to " + to_string(sendTo));
+        raft->syncCout("Dropout requestVote from " + to_string(serverId) + " to " + to_string(sendTo));
         RequestVoteResponse response;
         response.responded = false;
         return response;
@@ -538,7 +538,7 @@ RequestVoteResponse Server::requestVoteRPC(RequestVote request, int sendTo) {
     t.join();
 
     if (raft->dropoutHappens()) {
-        //raft->syncCout("Dropout requestVote response from " + to_string(sendTo) + " to " + to_string(serverId));
+        raft->syncCout("Dropout requestVote response from " + to_string(sendTo) + " to " + to_string(serverId));
         RequestVoteResponse response;
         response.responded = false;
         return response;
