@@ -1,14 +1,14 @@
 # Raft
-Pengcheng Rong
+Pengcheng Rong \
 Aaron Chang
 
 ### Build and Run
-```make```
+```make``` \
 ```./raft.o```
 
 ### Command Line Interface
 StartRaft [num_servers] [timeout_type]
-   - num_servers (int)             | number of initial server threads to create \
+   - num_servers (int)             | number of initial server threads to create
    - timeout_type (int, default=0) | 0 for deterministic election timeouts, any other int for random
 
 Sleep [num_seconds]
