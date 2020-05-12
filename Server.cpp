@@ -76,13 +76,13 @@ void Server::eventLoop() {
                     for (int c_idx = 0; c_idx < config_groups.size(); c_idx++) {
                         vector<int> s_ids = config_groups[c_idx];
                         int collected_votes = 0;
-                        // Vote for self only if in the current config
-                        if (std::find(s_ids.begin(), s_ids.end(), serverId) != s_ids.end()) {
-                            collected_votes++;
-                        }
                         // Request votes from all in config group
                         for (int idx = 0; idx < s_ids.size(); idx++) {
-                            if (s_ids[idx] == serverId) continue;
+                            if (s_ids[idx] == serverId) {
+                                // Vote for self only if present in the current config
+                                collected_votes++;
+                                continue;
+                            }
                             responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[idx], req, s_ids[idx]));
                         }
                         //use the .get() method on each future to get the response
