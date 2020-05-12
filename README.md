@@ -4,7 +4,10 @@ Aaron Chang
 
 ### Build and Run
 ```make``` \
-```./raft.o```
+Interactive mode:\
+```./raft.o```\
+Input file mode:\
+```./raft.o < ./test/test_election_simple.txt```
 
 ### Command Line Interface
 StartRaft [num_servers] [timeout_type]
