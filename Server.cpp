@@ -2,11 +2,12 @@
 
 void Server::onServerStart() {
     online = true;
+    // reset volatile variables because they are supposed to be lost
     state = Follower;
     leaderId = -1;
     currentTerm = -1;
     configIndex = -1;
-    interval = 1; // seconds between checking for requests
+    interval = 1; // seconds between running event loop
     // deterministic or randomized election timeout
     if (raft->timeoutType == 0) {
         timeout = 2 + (3 * serverId + 1);
@@ -16,7 +17,6 @@ void Server::onServerStart() {
     }
     last_time = time_now();
     votedFor = -1; // instead of NULL
-    // reset volatile variables because they are supposed to be lost
     commitIndex = 0;
     lastApplied = -1;
     if (nextIndex.size() > 0) {
@@ -59,7 +59,7 @@ void Server::eventLoop() {
                     int lastLogIndex;
                     int lastTerm;
                     if (log.size() == 0) {
-                        // Initial election
+                        // First ever election
                         lastLogIndex = 0;
                         lastTerm = 0;
                     }
@@ -75,7 +75,12 @@ void Server::eventLoop() {
                     // Get majorities from all configuration groups
                     for (int c_idx = 0; c_idx < config_groups.size(); c_idx++) {
                         vector<int> s_ids = config_groups[c_idx];
-                        int collected_votes = 1; // votes for self
+                        int collected_votes = 0;
+                        // Vote for self only if in the current config
+                        if (std::find(s_ids.begin(), s_ids.end(), serverId) != s_ids.end()) {
+                            collected_votes++;
+                        }
+                        // Request votes from all in config group
                         for (int idx = 0; idx < s_ids.size(); idx++) {
                             if (s_ids[idx] == serverId) continue;
                             responses.push_back( std::async(&Server::requestVoteRPC, raft->servers[idx], req, s_ids[idx]));
@@ -111,7 +116,7 @@ void Server::eventLoop() {
                             break;
                         }
                     }
-                    // Also recheck if state was reset by a new leader before winning election
+                    // Also recheck if state was reset by detecting a new leader before winning election
                     if (overall_win && state != Follower) {
                         state = Leader;
                         raft->syncCout("Server " + to_string(serverId) + " became the leader");
@@ -120,7 +125,7 @@ void Server::eventLoop() {
                 }
             }
             if (state == Leader) {
-                // If brand new raft, append the config to everyone's log
+                // If brand new raft, append the initial config to everyone's log
                 if (log.size() == 0) {
                     get_config(configIndex, config_groups);
                     string c_s = config_str(config_groups[0]); 
@@ -239,7 +244,7 @@ void Server::convertToFollowerIfNecessary(int requestTerm, int requestLeaderId) 
         currentTerm = requestTerm;
         leaderId = requestLeaderId;
         state = Follower;
-        // Reset votedFor only if it's a new leader
+        // Reset votedFor only if it's a new term
         votedFor = -1;
     }
     // If we called this, it was from an RPC and we can reset the election timer
@@ -280,7 +285,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
     } else if (request.prevLogIndex >=0 && (request.prevLogIndex >= log.size() || log[request.prevLogIndex].first != request.prevLogTerm)) {
         //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
         response.success = false;
-        //raft->syncCout("Append failed in server " + to_string(serverId) + " because of non-matching prevLogIndex");
+        // raft->syncCout("Append failed in server " + to_string(serverId) + " because of non-matching prevLogIndex");
         // if (log.size() > 0) raft->syncCout("log[request.prevLogIndex].first=" + to_string(log[request.prevLogIndex].first));
         // raft->syncCout("prevLogIndex:" + to_string(request.prevLogIndex) + " prevLogTerm:" + to_string(request.prevLogTerm));
         // raft->syncCout(log_to_string(log));
@@ -314,6 +319,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
             } else if (log[lastApplied].second.find("-=") != string::npos) {
                 split2(log[lastApplied].second, "-=", parts);
             } else if (log[lastApplied].second.find("config") != string::npos) {
+                // Store the latest config location
                 new_config_idx = lastApplied;
                 config_changed = true;
             }
@@ -329,7 +335,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
             configIndex = new_config_idx;
             raft->syncCout("Server " + to_string(serverId) + " changed configuration");
         }
-        // infered logic (not in paper)
+        // inferred logic (not in paper)
         leaderId = request.leaderId;
     }
     convertToFollowerIfNecessary(request.term, request.leaderId);
