@@ -6,12 +6,9 @@ clean:
 build: main.cpp Server.cpp Raft.cpp
 	g++ -pthread -o raft.o main.cpp Server.cpp Raft.cpp 
 
-debug: main.cpp Server.cpp Server.h Raft.cpp main.cpp utilities.h
+debug: main.cpp Server.cpp Raft.cpp
 	g++ -g -pthread -o raft.o main.cpp Server.cpp Raft.cpp
 
 test: clean build
-	echo "testing given examples"
+	echo "testing given example"
 	./raft.o < test/test_example.txt
-
-test_config: clean build
-	./raft.o < test/test_config_simple.txt
