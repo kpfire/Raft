@@ -75,7 +75,7 @@ void Server::eventLoop() {
                     // Get majorities from all configuration groups
                     for (int c_idx = 0; c_idx < config_groups.size(); c_idx++) {
                         vector<int> s_ids = config_groups[c_idx];
-                        int collected_votes = 1; // votes for self
+                        int collected_votes = 0;
                         for (int idx = 0; idx < s_ids.size(); idx++) {
                             int s_id = s_ids[idx];
                             if (s_id == serverId) {
