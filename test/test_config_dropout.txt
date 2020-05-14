@@ -1,0 +1,12 @@
+StartRaft 3
+Dropout 0.2
+Sleep 11
+Request 0 X 15
+Sleep 2
+Request 0 X -5
+Sleep 2
+ConfigChange 0 100,3,2
+Sleep 5
+CrashServer 2
+Sleep 15
+Request 3 X
