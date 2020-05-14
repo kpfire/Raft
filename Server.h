@@ -74,7 +74,7 @@ class Server {
 
     void onServerStart();
 
-    void convertToFollowerIfNecessary(int, int);
+    bool convertToFollowerIfNecessary(int, int);
 
     // after leader appens one entry to its log, call this to replicate this entry to all folloers
     void replicateLogEntry(int, int);

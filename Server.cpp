@@ -236,19 +236,21 @@ void Server::get_config(int c_idx, vector<vector<int>> &config_groups) {
     if (v2.size() > 0) config_groups.push_back(v2);
 }
 
-void Server::convertToFollowerIfNecessary(int requestTerm, int requestLeaderId) {
+bool Server::convertToFollowerIfNecessary(int requestTerm, int requestLeaderId) {
     // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
     // However, after checking our code, there is no way to have this: response.term > currentTerm
+    bool converted = false;
     if (requestTerm > currentTerm) {
         //cout << "Server " << serverId << " converted" << endl;
+        converted = true;
         currentTerm = requestTerm;
-        leaderId = requestLeaderId;
         state = Follower;
-        // Reset votedFor only if it's a new leader
+        // Every time we change terms, reset who we voted for
         votedFor = -1;
     }
     // If we called this, it was from an RPC and we can reset the election timer
     last_time = time_now();
+    return converted;
 }
 
 // the caller of all below methods should invoke these rpc calls in a separate thread
@@ -338,7 +340,10 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         // infered logic (not in paper)
         leaderId = request.leaderId;
     }
-    convertToFollowerIfNecessary(request.term, request.leaderId);
+    // Detect a new leader here
+    if (convertToFollowerIfNecessary(request.term, request.leaderId)) {
+        leaderId = request.leaderId;
+    }
     p.set_value(response);
     myLock.unlock();
 }
@@ -359,12 +364,13 @@ void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> 
             response.voteGranted = false;
     }
     else if (votedFor == -1 || votedFor == request.candidateId) {
-        if (log.size() - 1 <= request.lastLogIndex) {
+        if (log.size() <= (request.lastLogIndex + 1)) {
             // Candidate's log is up to date
             response.voteGranted = true;
         }
     }
     if (response.voteGranted == true) {
+        // Only if we voted for this candidate
         votedFor = request.candidateId;
         //raft->syncCout("Server " + to_string(serverId) + " granted vote to candidate " + to_string(request.candidateId));
     }

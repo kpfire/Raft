@@ -4,6 +4,8 @@ CrashServer 0
 Sleep 8
 RestartServer 0
 Sleep 3
+Request 1 X 10
+Sleep 3
 CrashServer 2
 CrashServer 1
 Sleep 14
