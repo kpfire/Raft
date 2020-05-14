@@ -69,8 +69,12 @@ bool Raft::belongToSamePartition(int server1, int server2) {
 
 void Raft::setDropoutProbability(double p){
     dropoutProbability = p;
+    // an RPC involves an incoming message and outgoing message (send out response). Dropout could happen in either (or both) stage.
+    // if the dropout rate of a single message is p, then the probability than at least one message
+    // is dropped is 1-(1-p)^2
+    double dropoutProbabilityInTwoWayCommunication = 1.0-(1.0-p)*(1.0-p);
     // Be 99.99% confident that communication between 2 online servers will eventually succeed if we try retry_times times
-    retry_times = max(1, (int)(log(0.0001) / log(p)));
+    retry_times = max(1, (int)ceil(log(0.0001) / log(dropoutProbabilityInTwoWayCommunication)));
     //syncCout("Set retry_times=" + to_string(retry_times));
 }
 
