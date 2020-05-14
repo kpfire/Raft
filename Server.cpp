@@ -158,9 +158,9 @@ void Server::eventLoop() {
                             myLock.lock();
                         }
                     }
+                    //raft->syncCout("Server " + to_string(serverId) + " finalized config change to: " + c_s);
                 }
-                // Else send out heartbeat
-                else {
+                else { // Send out heartbeats
                     for (int i = 0; i < config_groups.size(); i++) {
                         vector<int> v_temp = config_groups[i];
                         for (int idx = 0; idx < v_temp.size(); idx++) {
