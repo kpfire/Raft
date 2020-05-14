@@ -248,8 +248,6 @@ bool Server::convertToFollowerIfNecessary(int requestTerm, int requestLeaderId) 
         // Every time we change terms, reset who we voted for
         votedFor = -1;
     }
-    // If we called this, it was from an RPC and we can reset the election timer
-    last_time = time_now();
     return converted;
 }
 
@@ -340,10 +338,12 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         // infered logic (not in paper)
         leaderId = request.leaderId;
     }
-    // Detect a new leader here
+    // Detect a new leader here (§5.1)
     if (convertToFollowerIfNecessary(request.term, request.leaderId)) {
         leaderId = request.leaderId;
     }
+    // Reset election timer on appendEntries reception (§5.3)
+    last_time = time_now();
     p.set_value(response);
     myLock.unlock();
 }
@@ -372,8 +372,11 @@ void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> 
     if (response.voteGranted == true) {
         // Only if we voted for this candidate
         votedFor = request.candidateId;
+        // Reset election timer if we granted vote (§5.3)
+        last_time = time_now();
         //raft->syncCout("Server " + to_string(serverId) + " granted vote to candidate " + to_string(request.candidateId));
     }
+    // Detect more up-to-date term (§5.1)
     convertToFollowerIfNecessary(request.term, request.candidateId);
     p.set_value(response);
     myLock.unlock();
