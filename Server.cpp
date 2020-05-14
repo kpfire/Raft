@@ -335,7 +335,7 @@ void Server::appendEntries(AppendEntries request, std::promise<AppendEntriesResp
         }
         if (new_config_idx != configIndex) { 
             configIndex = new_config_idx;
-            raft->syncCout("Server " + to_string(serverId) + " changed configuration");
+            //raft->syncCout("Server " + to_string(serverId) + " changed configuration");
         }
         // infered logic (not in paper)
         leaderId = request.leaderId;
