@@ -355,18 +355,18 @@ void Server::requestVote(RequestVote request, std::promise<RequestVoteResponse> 
     response.responded = true;
     response.term = currentTerm;
     response.voteGranted = false;
-    if (votedFor == -1 || votedFor == request.candidateId) {
-        if (request.term > currentTerm) { // Candidate's term is more up to date
+    if (request.term < currentTerm) { // Candidate's term is *not* more up to date
+            response.voteGranted = false;
+    }
+    else if (votedFor == -1 || votedFor == request.candidateId) {
+        if (log.size() - 1 <= request.lastLogIndex) {
+            // Candidate's log is up to date
             response.voteGranted = true;
-        }
-        else if (request.term == currentTerm) { // Candidate's term is same but log is longer
-            if (log.size() <= request.lastLogIndex) {
-                response.voteGranted = true;
-            }
         }
     }
     if (response.voteGranted == true) {
         votedFor = request.candidateId;
+        //raft->syncCout("Server " + to_string(serverId) + " granted vote to candidate " + to_string(request.candidateId));
     }
     convertToFollowerIfNecessary(request.term, request.candidateId);
     p.set_value(response);
