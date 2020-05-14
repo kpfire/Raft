@@ -1,0 +1,13 @@
+StartRaft 3 0
+Dropout 0.1
+Sleep 11
+CrashServer 0
+Sleep 7
+Request 1 X 2
+RestartServer 0
+Sleep 1
+Request 1 X 3
+Sleep 1
+CrashServer 1
+Sleep 6
+Request 0 X

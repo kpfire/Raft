@@ -489,7 +489,7 @@ AppendEntriesResponse Server::repeatedlyAppendEntries(int replicateIndex, int re
 // RPC functions run on the caller
 AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicateTo) {
     if (raft->dropoutHappens()) {
-        //raft->syncCout("Dropout appendEntries from " + to_string(serverId) + " to " + to_string(replicateTo));
+        raft->syncCout("Dropout appendEntries from " + to_string(serverId) + " to " + to_string(replicateTo));
         AppendEntriesResponse response;
         response.responded = false;
         return response;
@@ -523,7 +523,7 @@ AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicate
     t.join();
 
     if (raft->dropoutHappens()) {
-        //raft->syncCout("Dropout appendEntries response from " + to_string(replicateTo) + " to " + to_string(serverId));
+        raft->syncCout("Dropout appendEntries response from " + to_string(replicateTo) + " to " + to_string(serverId));
         AppendEntriesResponse response;
         response.responded = false;
         return response;
@@ -535,7 +535,7 @@ AppendEntriesResponse Server::appendEntriesRPC(int replicateIndex, int replicate
 // RPC functions run on the caller
 RequestVoteResponse Server::requestVoteRPC(RequestVote request, int sendTo) {
     if (raft->dropoutHappens()) {
-        //raft->syncCout("Dropout requestVote from " + to_string(serverId) + " to " + to_string(sendTo));
+        raft->syncCout("Dropout requestVote from " + to_string(serverId) + " to " + to_string(sendTo));
         RequestVoteResponse response;
         response.responded = false;
         return response;
@@ -553,7 +553,7 @@ RequestVoteResponse Server::requestVoteRPC(RequestVote request, int sendTo) {
     t.join();
 
     if (raft->dropoutHappens()) {
-        //raft->syncCout("Dropout requestVote response from " + to_string(sendTo) + " to " + to_string(serverId));
+        raft->syncCout("Dropout requestVote response from " + to_string(sendTo) + " to " + to_string(serverId));
         RequestVoteResponse response;
         response.responded = false;
         return response;
